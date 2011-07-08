@@ -221,10 +221,16 @@ function blocks_delete_instance($instance,$pinned=false) {
 // (causing them to calculate their content in the process). Returns true or false. Parameter passed
 // by reference for speed; the array is actually not modified.
 function blocks_have_content(&$pageblocks, $position) {
+    global $USER;
 
     if (empty($pageblocks) || !is_array($pageblocks) || !array_key_exists($position,$pageblocks)) {
         return false;
     }
+
+    if (!empty($USER->adminediting)) {
+        return true;
+    }
+
     // use a for() loop to get references to the array elements
     // foreach() cannot fetch references in PHP v4.x
     for ($n=0; $n<count($pageblocks[$position]);$n++) {
