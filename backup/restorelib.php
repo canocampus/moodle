@@ -1439,6 +1439,8 @@ define('RESTORE_GROUPS_GROUPINGS', 3);
         if ($info) {
             //For each, section, save it to db
             foreach ($info->sections as $key => $sect) {
+                $key = clean_param($key, PARAM_INT);
+
                 $sequence = "";
                 $section = new object();
                 $section->course = $restore->course_id;
@@ -1484,6 +1486,7 @@ define('RESTORE_GROUPS_GROUPINGS', 3);
                 }
                 if ($newid) {
                     //save old and new section id
+                    $course_header->course_id = clean_param($course_header->course_id, PARAM_INT);
                     backup_putid ($restore->backup_unique_code,"course_sections",$key,$newid);
                 } else {
                     $status = false;
