@@ -1190,6 +1190,7 @@ define('RESTORE_GROUPS_GROUPINGS', 3);
             $newid = insert_record("course",$course);
             if ($newid) {
                 //save old and new course id
+                $course_header->course_id = clean_param($course_header->course_id, PARAM_INT);
                 backup_putid ($restore->backup_unique_code,"course",$course_header->course_id,$newid);
                 //Replace old course_id in course_header
                 $course_header->course_id = $newid;
@@ -1486,7 +1487,6 @@ define('RESTORE_GROUPS_GROUPINGS', 3);
                 }
                 if ($newid) {
                     //save old and new section id
-                    $course_header->course_id = clean_param($course_header->course_id, PARAM_INT);
                     backup_putid ($restore->backup_unique_code,"course_sections",$key,$newid);
                 } else {
                     $status = false;
