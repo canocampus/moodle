@@ -1190,7 +1190,6 @@ define('RESTORE_GROUPS_GROUPINGS', 3);
             $newid = insert_record("course",$course);
             if ($newid) {
                 //save old and new course id
-                $course_header->course_id = clean_param($course_header->course_id, PARAM_INT);
                 backup_putid ($restore->backup_unique_code,"course",$course_header->course_id,$newid);
                 //Replace old course_id in course_header
                 $course_header->course_id = $newid;
@@ -1440,7 +1439,10 @@ define('RESTORE_GROUPS_GROUPINGS', 3);
         if ($info) {
             //For each, section, save it to db
             foreach ($info->sections as $key => $sect) {
-                $key = clean_param($key, PARAM_INT);
+                // make sure we have a valid section id - MDL-28378
+                if (empty($key) || !is_numeric($key) || $key != $sect->id) {
+                    $status = false;
+                }
 
                 $sequence = "";
                 $section = new object();
@@ -8209,6 +8211,14 @@ define('RESTORE_GROUPS_GROUPINGS', 3);
         global $CFG, $USER;
         $status = true;
 
+        // course_header has valid parsed xml? - lightweight, might as well do before db call - MDL-28378
+        if (!restore_check_for_valid_ids($course_header, $errorstr)) {
+            if (!defined('RESTORE_SILENTLY')) {
+                notify($errorstr);
+            }
+            return false;
+        }
+
         //Checks for the required files/functions to restore every module
         //and include them
         if ($allmods = get_records("modules") ) {
@@ -9496,5 +9506,20 @@ define('RESTORE_GROUPS_GROUPINGS', 3);
         if ($openlog) {
            fclose($restorelog);
         }
+    }
+
+    function restore_check_for_valid_ids($course_header, &$errorstr) {
+        //make sure that course_id is a positive integer
+        if (empty($course_header->course_id) || !is_numeric($course_header->course_id)) {
+            $errorstr = 'moodle.xml contains invalid data located in an id tag. Please use only integers for ids.';
+            return false;
+        }
+
+        if (empty($course_header->category->id) || !is_numeric($course_header->category->id)) {
+            $errorstr = 'moodle.xml contains invalid data located in an id tag. Please use only integers for ids.';
+            return false;
+        }
+
+        return true;
     }
 ?>
