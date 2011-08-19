@@ -1530,34 +1530,41 @@ define('RESTORE_GROUPS_GROUPINGS', 3);
                                         $course_module->indent = $mod->indent;
                                         $course_module->visible = $mod->visible;
                                         $course_module->groupmode = $mod->groupmode;
-                                        if ($mod->groupingid and $grouping = restore_grouping_getid($restore, $mod->groupingid)) {
-                                            $course_module->groupingid = $grouping->new_id;
-                                        } else {
-                                            $course_module->groupingid = 0;
-                                        }
-                                        $course_module->groupmembersonly = $mod->groupmembersonly;
-                                        $course_module->instance = 0;
-                                        //NOTE: The instance (new) is calculated and updated in db in the
-                                        //      final step of the restore. We don't know it yet.
-                                        //print_object($course_module);                    //Debug
-                                        //Save it to db
-                                        if ($mod->idnumber) {
-                                            if (grade_verify_idnumber($mod->idnumber, $restore->course_id)) {
-                                                $course_module->idnumber = $mod->idnumber;
+                                        if (is_numeric($mod->groupingid)) {
+                                            if ($mod->groupingid and $grouping = restore_grouping_getid($restore, $mod->groupingid)) {
+                                                $course_module->groupingid = $grouping->new_id;
+                                            } else {
+                                                $course_module->groupingid = 0;
                                             }
-                                        }
-
-                                        $newidmod = insert_record("course_modules", addslashes_recursive($course_module));
-                                        if ($newidmod) {
-                                            //save old and new module id
-                                            //In the info field, we save the original instance of the module
-                                            //to use it later
-                                            backup_putid ($restore->backup_unique_code,"course_modules",
-                                                          $keym,$newidmod,$mod->instance);
-
-                                            $restore->mods[$mod->type]->instances[$mod->instance]->restored_as_course_module = $newidmod;
                                         } else {
                                             $status = false;
+                                        }
+
+                                        if ($status) {
+                                            $course_module->groupmembersonly = $mod->groupmembersonly;
+                                            $course_module->instance = 0;
+                                            //NOTE: The instance (new) is calculated and updated in db in the
+                                            //      final step of the restore. We don't know it yet.
+                                            //print_object($course_module);                    //Debug
+                                            //Save it to db
+                                            if ($mod->idnumber) {
+                                                if (grade_verify_idnumber($mod->idnumber, $restore->course_id)) {
+                                                    $course_module->idnumber = $mod->idnumber;
+                                                }
+                                            }
+
+                                            $newidmod = insert_record("course_modules", addslashes_recursive($course_module));                                        
+                                            if ($newidmod) {
+                                                //save old and new module id
+                                                //In the info field, we save the original instance of the module
+                                                //to use it later
+                                                backup_putid ($restore->backup_unique_code,"course_modules",
+                                                              $keym,$newidmod,$mod->instance);
+
+                                                $restore->mods[$mod->type]->instances[$mod->instance]->restored_as_course_module = $newidmod;
+                                            } else {
+                                                $status = false;
+                                            }
                                         }
                                         //Now, calculate the sequence field
                                         if ($status) {
