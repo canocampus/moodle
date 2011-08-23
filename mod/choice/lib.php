@@ -242,20 +242,42 @@ function choice_user_submit_response($formanswer, $choice, $userid, $courseid, $
 
     $current = get_record('choice_answers', 'choiceid', $choice->id, 'userid', $userid);
     $context = get_context_instance(CONTEXT_MODULE, $cm->id);
-    $countanswers = get_records("choice_answers", "optionid", $formanswer);
-    if ($countanswers) {
-        $countans = 0;
-        foreach ($countanswers as $ca) { //only return enrolled users.
-            if (has_capability('mod/choice:choose', $context, $ca->userid, false)) {
-                $countans = $countans+1;
-            }
+
+    $countanswers=0;
+    if($choice->limitanswers) {
+        // Find out whether groups are being used and enabled
+        if (groups_get_activity_groupmode($cm) > 0) {
+            $currentgroup = groups_get_activity_group($cm);
+        } else {
+            $currentgroup = 0;
+        }
+        if($currentgroup) {
+            // If groups are being used, retrieve responses only for users in
+            // current group
+            global $CFG;
+            $answers = get_records_sql("
+SELECT 
+    ca.*
+FROM 
+    {$CFG->prefix}choice_answers ca
+    INNER JOIN {$CFG->prefix}groups_members gm ON ca.userid=gm.userid
+WHERE
+    optionid=$formanswer
+    AND gm.groupid=$currentgroup");
+        } else {
+            // Groups are not used, retrieve all answers for this option ID
+            $answers = get_records("choice_answers", "optionid", $formanswer);
         }
 
-        $countanswers = $countans;
-    } else {
-        $countanswers = 0;
+        if ($answers) {
+            foreach ($answers as $a) { //only return enrolled users.
+                if (has_capability('mod/choice:choose', $context, $a->userid, false)) {
+                    $countanswers++;
+                }
+            }
+        }
+        $maxans = $choice->maxanswers[$formanswer];
     }
-    $maxans = $choice->maxanswers[$formanswer];
 
     if (!($choice->limitanswers && ($countanswers >= $maxans) )) {
         if ($current) {
@@ -380,7 +402,7 @@ function choice_show_results($choice, $course, $cm, $allresponses, $forcepublish
                         foreach ($allresponses[$optionid] as $user) {
                             $columncount[$optionid] += 1;
                             echo '<tr><td class="attemptcell">';
-                            if ($viewresponses) {
+                            if ($viewresponses and has_capability('mod/choice:deleteresponses',$context)) {
                                 echo '<input type="checkbox" name="attemptid[]" value="'. $user->id. '" />';
                             }
                             echo '</td><td class="picture">';
@@ -422,7 +444,7 @@ function choice_show_results($choice, $course, $cm, $allresponses, $forcepublish
             echo "</tr>";
             
             /// Print "Select all" etc.
-            if ($viewresponses) {
+            if ($viewresponses and has_capability('mod/choice:deleteresponses',$context)) {
                 echo '<tr><td></td><td>';
                 echo '<a href="javascript:select_all_in(\'DIV\',null,\'tablecontainer\');">'.get_string('selectall', 'quiz').'</a> / ';
                 echo '<a href="javascript:deselect_all_in(\'DIV\',null,\'tablecontainer\');">'.get_string('selectnone', 'quiz').'</a> ';

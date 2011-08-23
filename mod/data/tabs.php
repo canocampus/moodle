@@ -21,8 +21,9 @@
 //          http://www.gnu.org/copyleft/gpl.html                         //
 //                                                                       //
 ///////////////////////////////////////////////////////////////////////////
-/// This file to be included so we can assume config.php has already been included.
-/// We also assume that $user, $course, $currenttab have been set
+
+// This file to be included so we can assume config.php has already been included.
+// We also assume that $user, $course, $currenttab have been set
 
 
     if (empty($currenttab) or empty($data) or empty($course)) {
@@ -51,6 +52,12 @@
         if (data_user_can_add_entry($data, $currentgroup, $groupmode)) { // took out participation list here!
             $addstring = empty($editentry) ? get_string('add', 'data') : get_string('editentry', 'data');
             $row[] = new tabobject('add', $CFG->wwwroot.'/mod/data/edit.php?d='.$data->id, $addstring);
+        }
+        if (has_capability(DATA_CAP_EXPORT, $context)) {
+            // The capability required to Export database records is centrally defined in 'lib.php'
+            // and should be weaker than those required to edit Templates, Fields and Presets. 
+            $row[] = new tabobject('export', $CFG->wwwroot.'/mod/data/export.php?d='.$data->id,
+                         get_string('export', 'data'));
         }
         if (has_capability('mod/data:managetemplates', $context)) {
             if ($currenttab == 'list') {
@@ -95,7 +102,7 @@
         $activetwo = array('templates');
     }
 
-/// Print out the tabs and continue!
+// Print out the tabs and continue!
     print_tabs($tabs, $currenttab, $inactive, $activetwo);
 
 ?>

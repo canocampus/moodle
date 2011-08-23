@@ -2970,6 +2970,11 @@ function xmldb_main_upgrade($oldversion=0) {
     if ($result && $oldversion < 2007101512) {
         notify('Increasing size of user idnumber field, this may take a while...', 'notifysuccess');
 
+    /// Under MySQL and Postgres... detect old NULL contents and change them by correct empty string. MDL-14859
+        if ($CFG->dbfamily == 'mysql' || $CFG->dbfamily == 'postgres') {
+            execute_sql("UPDATE {$CFG->prefix}user SET idnumber = '' WHERE idnumber IS NULL", true);
+        }
+
     /// Define index idnumber (not unique) to be dropped form user
         $table = new XMLDBTable('user');
         $index = new XMLDBIndex('idnumber');
@@ -2995,6 +3000,40 @@ function xmldb_main_upgrade($oldversion=0) {
 
     /// Main savepoint reached
         upgrade_main_savepoint($result, 2007101512);
+    }
+
+    if ($result && $oldversion < 2007101513) {
+        $log_action = new stdClass();
+        $log_action->module = 'course';
+        $log_action->action = 'unenrol';
+        $log_action->mtable = 'course';
+        $log_action->field  = 'fullname';
+        if (!record_exists("log_display", "action", "unenrol",
+                    "module", "course")){
+            $result  = $result && insert_record('log_display', $log_action);
+        }
+        upgrade_main_savepoint($result, 2007101513);
+    }
+
+    if ($result && $oldversion < 2007101514) {
+        $table = new XMLDBTable('mnet_enrol_course');
+        $field = new XMLDBField('sortorder');
+        $field->setAttributes(XMLDB_TYPE_INTEGER, '10', true, true, null, false, false, 0);
+        $result = change_field_precision($table, $field);
+        upgrade_main_savepoint($result, 2007101514);
+    }
+
+    if ($result && $oldversion < 2007101515) {
+        $result = delete_records_select('role_names', sql_isempty('role_names', 'name', false, false));
+        upgrade_main_savepoint($result, 2007101515);
+    }
+
+    if ($result && $oldversion < 2007101517) {
+        if (isset($CFG->defaultuserroleid) and isset($CFG->guestroleid) and $CFG->defaultuserroleid == $CFG->guestroleid) {
+            // guest can not be selected in defaultuserroleid!
+            unset_config('defaultuserroleid');
+        }
+        upgrade_main_savepoint($result, 2007101517);
     }
 
     return $result;

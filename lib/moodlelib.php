@@ -2902,11 +2902,23 @@ function update_user_record($username, $authplugin) {
     if ($newinfo = $userauth->get_userinfo($username)) {
         $newinfo = truncate_userinfo($newinfo);
         foreach ($newinfo as $key => $value){
-            $confkey = 'field_updatelocal_' . $key;
-            if (!empty($userauth->config->$confkey) and $userauth->config->$confkey === 'onlogin') {
+            $confval = $userauth->config->{'field_updatelocal_' . $key};
+            $lockval = $userauth->config->{'field_lock_' . $key};
+            if (empty($confval) || empty($lockval)) {
+                continue;
+            }
+            if ($confval === 'onlogin') {
                 $value = addslashes(stripslashes($value));   // Just in case
-                set_field('user', $key, $value, 'username', $username)
-                    or error_log("Error updating $key for $username");
+                // MDL-4207 Don't overwrite modified user profile values with
+                // empty LDAP values when 'unlocked if empty' is set. The purpose
+                // of the setting 'unlocked if empty' is to allow the user to fill
+                // in a value for the selected field _if LDAP is giving
+                // nothing_ for this field. Thus it makes sense to let this value
+                // stand in until LDAP is giving a value for this field.
+                if (!(empty($value) && $lockval === 'unlockedifempty')) {
+                    set_field('user', $key, $value, 'username', $username)
+                        || error_log("Error updating $key for $username");
+                }
             }
         }
     }
@@ -2998,6 +3010,8 @@ function delete_user($user) {
         // notify auth plugin - do not block the delete even when plugin fails
         $authplugin = get_auth_plugin($user->auth);
         $authplugin->user_delete($user);
+
+        events_trigger('user_deleted', $user);
         return true;
 
     } else {
@@ -3425,15 +3439,25 @@ function set_login_session_preferences() {
  * Delete a course, including all related data from the database,
  * and any associated files from the moodledata folder.
  *
- * @param int $courseid The id of the course to delete.
+ * @param mixed $courseorid The id of the course or course object to delete.
  * @param bool $showfeedback Whether to display notifications of each action the function performs.
  * @return bool true if all the removals succeeded. false if there were any failures. If this
  *             method returns false, some of the removals will probably have succeeded, and others
  *             failed, but you have no way of knowing which.
  */
-function delete_course($courseid, $showfeedback = true) {
+function delete_course($courseorid, $showfeedback = true) {
     global $CFG;
     $result = true;
+
+    if (is_object($courseorid)) {
+        $courseid = $courseorid->id;
+        $course   = $courseorid;
+    } else {
+        $courseid = $courseorid;
+        if (!$course = get_record('course', 'id', $courseid)) {
+            return false;
+        } 
+    }
 
     // frontpage course can not be deleted!!
     if ($courseid == SITEID) {
@@ -3467,6 +3491,11 @@ function delete_course($courseid, $showfeedback = true) {
             notify("An error occurred while deleting the course files.");
         }
         $result = false;
+    }
+
+    if ($result) {
+        //trigger events
+        events_trigger('course_deleted', $course);
     }
 
     return $result;
@@ -3776,7 +3805,7 @@ function reset_course_userdata($data) {
 
     // remove all group members
     if (!empty($data->reset_groups_members)) {
-        groups_delete_group_members($data->courseid, false);
+        groups_delete_group_members($data->courseid);
         $status[] = array('component'=>$componentstr, 'item'=>get_string('removegroupsmembers', 'group'), 'error'=>false);
     }
 
@@ -6028,6 +6057,27 @@ function check_php_version($version='4.1.0') {
     return (version_compare(phpversion(), $version) >= 0);
 }
 
+/**
+ * Checks to see if is the browser operating system matches the specified 
+ * brand.
+ * 
+ * Known brand: 'Windows','Linux','Macintosh','SGI','SunOS','HP-UX'
+ *
+ * @uses $_SERVER
+ * @param string $brand The operating system identifier being tested 
+ * @return bool true if the given brand below to the detected operating system
+ */
+ function check_browser_operating_system($brand) {
+    if (empty($_SERVER['HTTP_USER_AGENT'])) {
+        return false;
+    }
+
+    if (preg_match("/$brand/i", $_SERVER['HTTP_USER_AGENT'])) {
+        return true;
+    }
+     
+    return false;  
+ }
 
 /**
  * Checks to see if is a browser matches the specified

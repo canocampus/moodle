@@ -2145,6 +2145,39 @@ function sql_bitnot($int1) {
 }
 
 /**
+ * Returns the FROM clause required by some DBs in all SELECT statements
+ * To be used in queries not having FROM clause to provide cross_db
+ */
+function sql_null_from_clause() {
+    global $CFG;
+
+    switch ($CFG->dbfamily) {
+        case 'oracle':
+            return ' FROM dual';
+            break;
+        default:
+            return '';
+    }
+}
+
+/**
+ * Returns the correct CEIL expression applied to fieldname
+ * @param string fieldname the field (or expression) we are going to ceil
+ * @return string the piece of SQL code to be used in your ceiling statement
+ */
+function sql_ceil($fieldname) {
+    global $CFG;
+
+    switch ($CFG->dbfamily) {
+        case 'mssql':
+            return ' CEILING(' . $fieldname . ')';
+            break;
+        default:
+            return ' CEIL(' . $fieldname . ')';
+    }
+}
+
+/**
  * Prepare a SQL WHERE clause to select records where the given fields match the given values.
  *
  * Prepares a where clause of the form

@@ -71,6 +71,19 @@ function mnet_get_public_key($uri, $application=null) {
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
 
     $res = xmlrpc_decode(curl_exec($ch));
+
+    // check for curl errors
+    $curlerrno = curl_errno($ch);
+    if ($curlerrno!=0) {
+        debugging("Request for $uri failed with curl error $curlerrno");
+    } 
+
+    // check HTTP error code
+    $info =  curl_getinfo($ch);
+    if (!empty($info['http_code']) and ($info['http_code'] != 200)) {
+        debugging("Request for $uri failed with HTTP code ".$info['http_code']);
+    }
+
     curl_close($ch);
 
     if (!is_array($res)) { // ! error
@@ -83,7 +96,16 @@ function mnet_get_public_key($uri, $application=null) {
                 mnet_set_public_key($uri, $public_certificate);
                 return $public_certificate;
             }
+            else {
+                debugging("Request for $uri returned public key for different URI - $host");
+            }
         }
+        else {
+            debugging("Request for $uri returned empty response");
+        }
+    }
+    else {
+        debugging( "Request for $uri returned unexpected result");
     }
     return false;
 }
@@ -285,6 +307,12 @@ function mnet_get_keypair() {
  */
 function mnet_generate_keypair($dn = null, $days=28) {
     global $CFG, $USER;
+
+    // check if lifetime has been overriden
+    if (!empty($CFG->mnetkeylifetime)) {
+        $days = $CFG->mnetkeylifetime;
+    }
+
     $host = strtolower($CFG->wwwroot);
     $host = ereg_replace("^http(s)?://",'',$host);
     $break = strpos($host.'/' , '/');

@@ -93,6 +93,42 @@ define('RESTORE_GROUPS_GROUPINGS', 3);
             echo "<ul>";
         }
 
+        // Recode links in the course summary.
+        if (!defined('RESTORE_SILENTLY')) {
+            echo '<li>' . get_string('from') . ' ' . get_string('course');
+        }
+        $course = get_record('course', 'id', $restore->course_id, '', '', '', '', 'id,summary');
+        $coursesummary = restore_decode_content_links_worker($course->summary, $restore);
+        if ($coursesummary != $course->summary) {
+            $course->summary = addslashes($coursesummary);
+            if (!update_record('course', $course)) {
+                $status = false;
+            }
+        }
+        if (!defined('RESTORE_SILENTLY')) {
+            echo '</li>';
+        }
+
+        // Recode links in section summaries.
+        $sections = get_records('course_sections', 'course', $restore->course_id, 'id', 'id,summary');
+        if ($sections) {
+            if (!defined('RESTORE_SILENTLY')) {
+                echo '<li>' . get_string('from') . ' ' . get_string('sections');
+            }
+            foreach ($sections as $section) {
+                $sectionsummary = restore_decode_content_links_worker($section->summary, $restore);
+                if ($sectionsummary != $section->summary) {
+                    $section->summary = addslashes($sectionsummary);
+                    if (!update_record('course_sections', $section)) {
+                        $status = false;
+                    }
+                }
+            }
+            if (!defined('RESTORE_SILENTLY')) {
+                echo '</li>';
+            }
+        }
+
         // Restore links in modules.
         foreach ($restore->mods as $name => $info) {
             //If the module is being restored
@@ -641,7 +677,7 @@ define('RESTORE_GROUPS_GROUPINGS', 3);
 
         // else we try to get it from the xml file
         //Now calculate the category
-        if (!$category) {
+        if (empty($category)) {
             $category = get_record("course_categories","id",$course_header->category->id,
                                    "name",addslashes($course_header->category->name));
         }
@@ -3354,7 +3390,8 @@ define('RESTORE_GROUPS_GROUPINGS', 3);
 
             //We have to recode the userid field
             if (!$user = backup_getid($restore->backup_unique_code,"user",$group_member->userid)) {
-                $status = false;
+                debugging("group membership can not be restored, user id $group_member->userid not presetn in backup");
+                // do not not block the restore 
                 continue;
             }
 
@@ -3635,6 +3672,7 @@ define('RESTORE_GROUPS_GROUPINGS', 3);
     function restore_decode_absolute_links($content) {
 
         global $CFG,$restore;
+        require_once($CFG->libdir.'/filelib.php');
 
     /// MDL-14072: Prevent NULLs, empties and numbers to be processed by the
     /// heavy interlinking. Just a few cpu cycles saved.
@@ -3648,17 +3686,7 @@ define('RESTORE_GROUPS_GROUPINGS', 3);
 
         //Now decode wwwroot and file.php calls
         $search = array ("$@FILEPHP@$");
-
-        //Check for the status of the slasharguments config variable
-        $slash = $CFG->slasharguments;
-
-        //Build the replace string as needed
-        if ($slash == 1) {
-            $replace = array ($CFG->wwwroot."/file.php/".$restore->course_id);
-        } else {
-            $replace = array ($CFG->wwwroot."/file.php?file=/".$restore->course_id);
-        }
-
+        $replace = array(get_file_url($restore->course_id));
         $result = str_replace($search,$replace,$content);
 
         if ($result != $content && debugging()) {                                  //Debug
@@ -8347,18 +8375,20 @@ define('RESTORE_GROUPS_GROUPINGS', 3);
                         insert_record('role_capabilities', $roleinfo);
                     }
                 }
-            /// Now, restore role nameincourse
-                $newrole = backup_getid($restore->backup_unique_code, 'role', $oldroleid); /// Look for target role
-                $coursecontext = get_context_instance(CONTEXT_COURSE, $restore->course_id); /// Look for target context
-                if (!empty($newrole->new_id) && !empty($coursecontext)) {
-                /// Check the role hasn't any custom name in context
-                    if (!record_exists('role_names', 'roleid', $newrole->new_id, 'contextid', $coursecontext->id)) {
-                        $rolename = new object();
-                        $rolename->roleid = $newrole->new_id;
-                        $rolename->contextid = $coursecontext->id;
-                        $rolename->name = addslashes($roledata->nameincourse);
+            /// Now, restore role nameincourse (only if the role had nameincourse in backup)
+                if (!empty($roledata->nameincourse)) {
+                    $newrole = backup_getid($restore->backup_unique_code, 'role', $oldroleid); /// Look for target role
+                    $coursecontext = get_context_instance(CONTEXT_COURSE, $restore->course_id); /// Look for target context
+                    if (!empty($newrole->new_id) && !empty($coursecontext)) {
+                    /// Check the role hasn't any custom name in context
+                        if (!record_exists('role_names', 'roleid', $newrole->new_id, 'contextid', $coursecontext->id)) {
+                            $rolename = new object();
+                            $rolename->roleid = $newrole->new_id;
+                            $rolename->contextid = $coursecontext->id;
+                            $rolename->name = addslashes($roledata->nameincourse);
 
-                        insert_record('role_names', $rolename);
+                            insert_record('role_names', $rolename);
+                        }
                     }
                 }
             }

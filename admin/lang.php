@@ -294,7 +294,7 @@
                         $missingcounter++;
                     }
                     if (LANG_LINK_MISSING_STRINGS && ($missingstring || $translationsdiffer)) {
-                        $missinglinkstart = "<a href=\"lang.php?mode=compare&amp;currentfile=$filename#missing$missingcounter\">";
+                        $missinglinkstart = "<a href=\"lang.php?mode=compare&amp;currentfile=$filename#$key\">";
                         $missinglinkend = '</a>';
                     } else {
                         $missinglinkstart = '';
@@ -555,7 +555,7 @@
                 $linescounter++ ;
                 if (LANG_SUBMIT_REPEAT &&  $editable && $linescounter % LANG_SUBMIT_REPEAT_EVERY == 0) {
                     $o .= '<tr><td>&nbsp;</td><td><br />';
-                    $o .= '<input type="submit" name="update" value="'.get_string('savechanges').': '.$currentfile.'" />';
+                    $o .= '<input type="submit" tabindex="'.$missingcounter.'" name="update" value="'.get_string('savechanges').': '.$currentfile.'" />';
                     $o .= '<br />&nbsp;</td></tr>';
                 }
                 $envalue = nl2br(htmlspecialchars($envalue));
@@ -571,7 +571,7 @@
                 }
                 $o .= '">';
                 $o .= '<td dir="ltr" lang="en">';
-                $o .= '<span class="stren">'.$envalue.'</span>';
+                $o .= '<span id="'.$key.'" class="stren">'.$envalue.'</span>';
                 $o .= '<br />'."\n";
                 $o .= '<span class="strkey">'.$key.'</span>';
                 $o .= '</td>'."\n";
@@ -613,7 +613,7 @@
                     }
                 } else {
                     // the string is translated in the pack being processed
-                    if ($value <> $value2 && ($uselocal || $value2 <> '')) {
+                    if ($value <> $value2 && ($value2 <> '')) {
                         $cellcolour = 'class="localdifferent"';
                         $usetabindex = true;
                         $missingcounter++;
@@ -668,7 +668,7 @@
                 $o .= '<input type="hidden" name="sesskey" value="'.$USER->sesskey.'" />';
                 $o .= '<input type="hidden" name="currentfile" value="'.$currentfile.'" />';
                 $o .= '<input type="hidden" name="mode" value="compare" />';
-                $o .= '<input type="submit" name="update" value="'.get_string('savechanges').': '.$currentfile.'" />';
+                $o .= '<input type="submit" name="update" tabindex="'.$missingcounter.'" value="'.get_string('savechanges').': '.$currentfile.'" />';
                 $o .= '</td></tr>';
             }
             $o .= '</table>';

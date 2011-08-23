@@ -5,24 +5,40 @@ define('BYTESERVING_BOUNDARY', 's1k2o3d4a5k6s7'); //unique string constant
 function get_file_url($path, $options=null, $type='coursefile') {
     global $CFG;
 
+    $path = str_replace('//', '/', $path);  
     $path = trim($path, '/'); // no leading and trailing slashes
 
     // type of file
     switch ($type) {
-        case 'coursefile':
+       case 'questionfile':
+            $url = $CFG->wwwroot."/question/exportfile.php";
+            break;
+       case 'rssfile':
+            $url = $CFG->wwwroot."/rss/file.php";
+            break;
+        case 'user':
+            $url = $CFG->wwwroot."/user/pix.php";
+            break;
+        case 'usergroup':
+            $url = $CFG->wwwroot."/user/pixgroup.php";
+            break;
+        case 'httpscoursefile':
+            $url = $CFG->httpswwwroot."/file.php";
+            break;
+         case 'coursefile':
         default:
-            $url = "$CFG->wwwroot/file.php";
+            $url = $CFG->wwwroot."/file.php";
     }
 
     if ($CFG->slasharguments) {
         $parts = explode('/', $path);
-        $parts = array_map('urlencode', $parts);
+        $parts = array_map('rawurlencode', $parts);
         $path  = implode('/', $parts);
-        $ffurl = "$CFG->wwwroot/file.php/$path";
+        $ffurl = $url.'/'.$path;
         $separator = '?';
     } else {
-        $path = urlencode("/$path");
-        $ffurl = "$CFG->wwwroot/file.php?file=$path";
+        $path = rawurlencode('/'.$path);
+        $ffurl = $url.'?file='.$path;
         $separator = '&amp;';
     }
 
@@ -333,6 +349,7 @@ function get_mimetypes_array() {
         'xhtml'=> array ('type'=>'application/xhtml+xml', 'icon'=>'html.gif'),
         'htm'  => array ('type'=>'text/html', 'icon'=>'html.gif'),
         'ico'  => array ('type'=>'image/vnd.microsoft.icon', 'icon'=>'image.gif'),
+        'ics'  => array ('type'=>'text/calendar', 'icon'=>'text.gif'),
         'isf'  => array ('type'=>'application/inspiration', 'icon'=>'isf.gif'),
         'ist'  => array ('type'=>'application/inspiration.template', 'icon'=>'isf.gif'),
         'java' => array ('type'=>'text/plain', 'icon'=>'text.gif'),
@@ -538,6 +555,72 @@ function get_mimetype_description($mimetype,$capitalise=false) {
 }
 
 /**
+ * Handles the sending of temporary file to user, download is forced.
+ * File is deleted after abort or succesful sending.
+ * @param string $path path to file, preferably from moodledata/temp/something; or content of file itself
+ * @param string $filename proposed file name when saving file
+ * @param bool $path is content of file
+ */
+function send_temp_file($path, $filename, $pathisstring=false) {
+    global $CFG;
+
+    // close session - not needed anymore
+    @session_write_close();
+
+    if (!$pathisstring) {
+        if (!file_exists($path)) {
+            header('HTTP/1.0 404 not found');
+            error(get_string('filenotfound', 'error'), $CFG->wwwroot.'/');
+        }
+        // executed after normal finish or abort
+        @register_shutdown_function('send_temp_file_finished', $path);
+    }
+
+    //IE compatibiltiy HACK!
+    if (ini_get('zlib.output_compression')) {
+        ini_set('zlib.output_compression', 'Off');
+    }
+
+    // if user is using IE, urlencode the filename so that multibyte file name will show up correctly on popup
+    if (check_browser_version('MSIE')) {
+        $filename = urlencode($filename);
+    }
+
+    $filesize = $pathisstring ? strlen($path) : filesize($path);
+
+    @header('Content-Disposition: attachment; filename='.$filename);
+    @header('Content-Length: '.$filesize);
+    if (strpos($CFG->wwwroot, 'https://') === 0) { //https sites - watch out for IE! KB812935 and KB316431
+        @header('Cache-Control: max-age=10');
+        @header('Expires: '. gmdate('D, d M Y H:i:s', 0) .' GMT');
+        @header('Pragma: ');
+    } else { //normal http - prevent caching at all cost
+        @header('Cache-Control: private, must-revalidate, pre-check=0, post-check=0, max-age=0');
+        @header('Expires: '. gmdate('D, d M Y H:i:s', 0) .' GMT');
+        @header('Pragma: no-cache');
+    }
+    @header('Accept-Ranges: none'); // Do not allow byteserving
+
+    while (@ob_end_flush()); //flush the buffers - save memory and disable sid rewrite
+    if ($pathisstring) {
+        echo $path;
+    } else {
+        readfile_chunked($path);
+    }
+
+    die; //no more chars to output
+}
+
+/**
+ * Internal callnack function used by send_temp_file()
+ */
+function send_temp_file_finished($path) {
+    if (file_exists($path)) {
+        @unlink($path);
+    }
+}
+
+/**
  * Handles the sending of file data to the user's browser, including support for
  * byteranges etc.
  * @param string $path Path of file on disk (including real filename), or actual content of file as string
@@ -593,13 +676,13 @@ function send_file($path, $filename, $lifetime=86400 , $filter=0, $pathisstring=
 
     // if user is using IE, urlencode the filename so that multibyte file name will show up correctly on popup
     if (check_browser_version('MSIE')) {
-        $filename = urlencode($filename);
+        $filename = rawurlencode($filename);
     }
 
     if ($forcedownload) {
-        @header('Content-Disposition: attachment; filename='.$filename);
+        @header('Content-Disposition: attachment; filename="'.$filename.'"');
     } else {
-        @header('Content-Disposition: inline; filename='.$filename);
+        @header('Content-Disposition: inline; filename="'.$filename.'"');
     }
 
     if ($lifetime > 0) {

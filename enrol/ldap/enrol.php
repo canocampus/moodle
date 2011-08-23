@@ -69,9 +69,7 @@ function setup_enrolments(&$user) {
                 if($CFG->enrol_ldap_autocreate){ // autocreate
                     error_log("[ENROL_LDAP] CREATE User $user->username enrolled to a nonexistant course $course_ext_id \n");
                     $newcourseid = $this->create_course($enrol);
-                    $course_obj = get_record( 'course',
-                                      $this->enrol_localcoursefield,
-                                       $newcourseid);
+                    $course_obj = get_record( 'course', 'id', $newcourseid);
                 } else {
                     error_log("[ENROL_LDAP] User $user->username enrolled to a nonexistant course $course_ext_id \n");
                 }
@@ -243,6 +241,7 @@ function sync_enrolments($type, $enrol = false) {
 
                         $ldapmembers = $course[strtolower($CFG->{'enrol_ldap_memberattribute_role'.$role->id} )]; 
                         unset($ldapmembers['count']); // remove oddity ;)
+                        $ldapmembers = addslashes_recursive($ldapmembers);
                     }
                     
                     // prune old ldap enrolments
@@ -278,9 +277,9 @@ function sync_enrolments($type, $enrol = false) {
                         $sql = 'SELECT id,1 FROM '.$CFG->prefix.'user '
                                 ." WHERE idnumber='$ldapmember'";
                         $member = get_record_sql($sql); 
-//                        print "sql: $sql \nidnumber = $ldapmember \n" . var_dump($member); 
+//                        print "sql: $sql \nidnumber = ".stripslashes($ldapmember)." \n".var_dump($member); 
                         if(empty($member) || empty($member->id)){
-                            print "Could not find user $ldapmember, skipping\n";
+                            print "Could not find user ".stripslashes($ldapmember).", skipping\n";
                             continue;
                         }
                         $member = $member->id;
@@ -288,9 +287,9 @@ function sync_enrolments($type, $enrol = false) {
                                         'contextid', $context->id, 
                                         'userid', $member, 'enrol', 'ldap')){
                             if (role_assign($role->id, $member, 0, $context->id, 0, 0, 0, 'ldap')){
-                                print "Assigned role $type to $member ($ldapmember) for course $course_obj->id ($course_obj->shortname)\n";
+                                print "Assigned role $type to $member (".stripslashes($ldapmember).") for course $course_obj->id ($course_obj->shortname)\n";
                             } else {
-                                print "Failed to assign role $type to $member ($ldapmember) for course $course_obj->id ($course_obj->shortname)\n";
+                                print "Failed to assign role $type to $member (".stripslashes($ldapmember).") for course $course_obj->id ($course_obj->shortname)\n";
                             }
                         }
                     }

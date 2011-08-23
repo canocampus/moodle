@@ -142,6 +142,10 @@
 
     if ($user->deleted) {
         print_heading(get_string('userdeleted'));
+        if (!has_capability('moodle/user:update', $coursecontext)) {
+            print_footer($course);
+            die;
+        }
     }
 
 /// OK, security out the way, now we are showing the user
@@ -171,7 +175,9 @@
 
     $currenttab = 'profile';
     $showroles = 1;
-    include('tabs.php');
+    if (!$user->deleted) {
+        include('tabs.php');
+    }
 
     if (is_mnet_remote_user($user)) {
         $sql = "
@@ -221,19 +227,13 @@
 
     echo '<table class="list">';
 
-    if (($user->city or $user->country) and (!isset($hiddenfields['city']) or !isset($hiddenfields['country']))) {
-        $location = '';
-        if ($user->city && !isset($hiddenfields['city'])) {
-            $location .= $user->city;
-        }
-        if (!empty($countries[$user->country]) && !isset($hiddenfields['country'])) {
-            if ($user->city && !isset($hiddenfields['country'])) {
-                $location .= ', ';
-            }
-            $countries = get_list_of_countries();
-            $location .= $countries[$user->country];
-        }
-        print_row(get_string("city").":", $location);
+    if (! isset($hiddenfields['country']) && $user->country) {
+        $countries = get_list_of_countries();
+        print_row(get_string('country') . ':', $countries[$user->country]);
+    }
+
+    if (! isset($hiddenfields['city']) && $user->city) {
+        print_row(get_string('city') . ':', $user->city);
     }
 
     if (has_capability('moodle/user:viewhiddendetails', $coursecontext)) {
@@ -474,7 +474,7 @@
         }
     }
 
-    if ($USER->id != $user->id  && empty($USER->realuser) && has_capability('moodle/user:loginas', $coursecontext) &&
+    if (!$user->deleted and $USER->id != $user->id  && empty($USER->realuser) && has_capability('moodle/user:loginas', $coursecontext) &&
                                  ! has_capability('moodle/site:doanything', $coursecontext, $user->id, false)) {
         echo '<form action="'.$CFG->wwwroot.'/course/loginas.php" method="get">';
         echo '<div>';
@@ -486,7 +486,7 @@
         echo '</form>';
     }
 
-    if (!empty($CFG->messaging) and !isguest() and has_capability('moodle/site:sendmessage', get_context_instance(CONTEXT_SYSTEM))) {
+    if (!$user->deleted and !empty($CFG->messaging) and !isguest() and has_capability('moodle/site:sendmessage', get_context_instance(CONTEXT_SYSTEM))) {
         if (!empty($USER->id) and ($USER->id == $user->id)) {
             if ($countmessages = count_records('message', 'useridto', $user->id)) {
                 $messagebuttonname = get_string("messages", "message")."($countmessages)";

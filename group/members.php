@@ -64,12 +64,6 @@ if ($frm = data_submitted() and confirm_sesskey()) {
             if (!groups_remove_member($groupid, $userid)) {
                 print_error('erroraddremoveuser', 'group', $returnurl);
             }
-
-            // MDL-9983
-            $eventdata = new object();
-            $eventdata -> groupid = $groupid;
-            $eventdata -> userid = $userid;
-            events_trigger('group_user_removed', $eventdata);
         }
     }
 }
@@ -167,7 +161,7 @@ foreach ($nonmembers as $userid => $potentalmember) {
         $usergrouplist = '<ul>';
 
         foreach ($usergroups[$userid] as $groupitem) {
-            $usergrouplist .= '<li>'.addslashes(format_string($groupitem->name)).'</li>';
+            $usergrouplist .= '<li>'.addslashes_js(format_string($groupitem->name)).'</li>';
         }
         $usergrouplist .= '</ul>';
     }
@@ -235,9 +229,8 @@ function updateUserSummary() {
 
         <?php check_theme_arrows(); ?>
         <p class="arrow_button">
-            <input name="add" id="add" type="submit" value="<?php echo '&nbsp;'.$THEME->larrow.' &nbsp; &nbsp; '.get_string('add'); ?>" title="<?php print_string('add'); ?>" />
-            <br />
-            <input name="remove" id="remove" type="submit" value="<?php echo '&nbsp; '.$THEME->rarrow.' &nbsp; &nbsp; '.get_string('remove'); ?>" title="<?php print_string('remove'); ?>" />
+            <input name="add" id="add" type="submit" value="<?php echo $THEME->larrow.'&nbsp;'.get_string('add'); ?>" title="<?php print_string('add'); ?>" /><br />
+            <input name="remove" id="remove" type="submit" value="<?php echo get_string('remove').'&nbsp;'.$THEME->rarrow; ?>" title="<?php print_string('remove'); ?>" />
         </p>
       </td>
       <td valign="top">

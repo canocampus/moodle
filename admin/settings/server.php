@@ -102,7 +102,7 @@ $ADMIN->add('server', $temp);
 // "debugging" settingpage
 $temp = new admin_settingpage('debugging', get_string('debugging', 'admin'));
 $temp->add(new admin_setting_special_debug());
-$temp->add(new admin_setting_configcheckbox('debugdisplay', get_string('debugdisplay', 'admin'), get_string('configdebugdisplay', 'admin'), ini_get('display_errors')));
+$temp->add(new admin_setting_configcheckbox('debugdisplay', get_string('debugdisplay', 'admin'), get_string('configdebugdisplay', 'admin'), ini_get_bool('display_errors')));
 $temp->add(new admin_setting_configcheckbox('xmlstrictheaders', get_string('xmlstrictheaders', 'admin'), get_string('configxmlstrictheaders', 'admin'), 0));
 $temp->add(new admin_setting_configcheckbox('debugsmtp', get_string('debugsmtp', 'admin'), get_string('configdebugsmtp', 'admin'), 0));
 $temp->add(new admin_setting_configcheckbox('perfdebug', get_string('perfdebug', 'admin'), get_string('configperfdebug', 'admin'), '7', '15', '7'));
@@ -185,6 +185,15 @@ $temp->add(new admin_setting_configselect('deleteunconfirmed', get_string('delet
                                                                                                                                                                     12 => get_string('numhours', '', 12),
                                                                                                                                                                     6 => get_string('numhours', '', 6),
                                                                                                                                                                     1 => get_string('numhours', '', 1))));
+
+$temp->add(new admin_setting_configselect('deleteincompleteusers', get_string('deleteincompleteusers', 'admin'), get_string('configdeleteincompleteusers', 'admin'), 0, array(0 => get_string('never'),
+                                                                                                                                                                    168 => get_string('numdays', '', 7),
+                                                                                                                                                                    144 => get_string('numdays', '', 6),
+                                                                                                                                                                    120 => get_string('numdays', '', 5),
+                                                                                                                                                                    96 => get_string('numdays', '', 4),
+                                                                                                                                                                    72 => get_string('numdays', '', 3),
+                                                                                                                                                                    48 => get_string('numdays', '', 2),
+                                                                                                                                                                    24 => get_string('numdays', '', 1))));
 
 $temp->add(new admin_setting_configselect('loglifetime', get_string('loglifetime', 'admin'), get_string('configloglifetime', 'admin'), 0, array(0 => get_string('neverdeletelogs'),
                                                                                                                                                 1000 => get_string('numdays', '', 1000),

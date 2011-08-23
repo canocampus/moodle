@@ -529,9 +529,11 @@
         //add admin_tree block to site if not already present
         if ($admintree = get_record('block', 'name', 'admin_tree')) {
             $page = page_create_object(PAGE_COURSE_VIEW, SITEID);
-            blocks_execute_action($page, blocks_get_by_page($page), 'add', (int)$admintree->id, false, false);
+            $pageblocks=blocks_get_by_page($page);
+            blocks_execute_action($page, $pageblocks, 'add', (int)$admintree->id, false, false);
             if ($admintreeinstance = get_record('block_instance', 'pagetype', $page->type, 'pageid', SITEID, 'blockid', $admintree->id)) {
-                blocks_execute_action($page, blocks_get_by_page($page), 'moveleft', $admintreeinstance, false, false);
+                $pageblocks=blocks_get_by_page($page); // Needs to be re-got, since has just changed
+                blocks_execute_action($page, $pageblocks, 'moveleft', $admintreeinstance, false, false);
             }
         }
 
@@ -567,6 +569,8 @@
 /// check that site is properly customized
     if (empty($site->shortname)) {
         // probably new installation - lets return to frontpage after this step
+        // remove settings that we want uninitialised
+        unset_config('registerauth');
         redirect('upgradesettings.php?return=site');
     }
 
@@ -608,6 +612,10 @@
 
     if (is_dataroot_insecure()) {
         print_box(get_string('datarootsecuritywarning', 'admin', $CFG->dataroot), 'generalbox adminwarning');
+    }
+
+    if (defined('WARN_DISPLAY_ERRORS_ENABLED')) {
+        print_box(get_string('displayerrorswarning', 'admin'), 'generalbox adminwarning');
     }
 
     if (substr($CFG->wwwroot, -1) == '/') {

@@ -419,7 +419,6 @@ form.popupform label {
 }
 
 .arrow_button input {
-  width:2.4em;
   padding:0.3em;
   overflow:hidden;
 }
@@ -2131,6 +2130,9 @@ body#group-index #groupeditform {
   text-align: center;
 }
 
+#add, #remove{
+    text-align:center;
+}
 
 /***
  *** Doc
@@ -3871,6 +3873,7 @@ table.quizreviewsummary td.cell {
 #mod-quiz-edit #page .controls,
 #mod-quiz-edit #page .quizattemptcounts
 {
+  clear : left;
   text-align: center;
 }
 #mod-quiz-edit .quizquestions h2 {
@@ -4007,6 +4010,7 @@ table.quizreviewsummary td.cell {
 }
 .quizattemptcounts {
   text-align: center;
+  clear : left;
   margin: 6px 0;
 }
 /***

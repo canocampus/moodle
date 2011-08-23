@@ -358,8 +358,8 @@ class moodle_url {
     function remove_params(){
         if ($thisargs = func_get_args()){
             foreach ($thisargs as $arg){
-                if (isset($this->params->$arg)){
-                    unset($this->params->$arg);
+                if (isset($this->params[$arg])){
+                    unset($this->params[$arg]);
                 }
             }
         } else { // no args
@@ -392,12 +392,15 @@ class moodle_url {
      *
      * @param  array $exclude params to ignore
      * @param integer $indent indentation
+     * @param array $overrideparams params to add to the output params, these
+     * override existing ones with the same name.
      * @return string html for form elements.
      */
-    function hidden_params_out($exclude = array(), $indent = 0){
+    function hidden_params_out($exclude = array(), $indent = 0, $overrideparams=array()){
         $tabindent = str_repeat("\t", $indent);
         $str = '';
-        foreach ($this->params as $key => $val){
+        $params = $overrideparams + $this->params;
+        foreach ($params as $key => $val){
             if (FALSE === array_search($key, $exclude)) {
                 $val = s($val);
                 $str.= "$tabindent<input type=\"hidden\" name=\"$key\" value=\"$val\" />\n";
@@ -1175,7 +1178,9 @@ $targetwindow='self', $selectlabel='', $optionsextra=NULL) {
 
     //IE and Opera fire the onchange when ever you move into a dropdwown list with the keyboard. 
     //onfocus will call a function inside dropdown.js. It fixes this IE/Opera behavior.
-    if (check_browser_version('MSIE') || check_browser_version('Opera')) {
+    //Note: There is a bug on Opera+Linux with the javascript code (first mouse selection is inactive), 
+    //so we do not fix the Opera behavior on Linux
+    if (check_browser_version('MSIE') || (check_browser_version('Opera') && !check_browser_operating_system("Linux"))) {
         $output .= '<div>'.$selectlabel.$button.'<select id="'.$formid.'_jump" onfocus="initSelect(\''.$formid.'\','.$targetwindow.')" name="jump">'."\n";
     }
     //Other browser
@@ -2228,7 +2233,13 @@ function html_to_text($html) {
 
     require_once($CFG->libdir .'/html2text.php');
 
-    return html2text($html);
+    $result = html2text($html);
+    
+    // html2text does not fix numerical entities so handle those here.
+    $tl=textlib_get_instance();
+    $result = $tl->entities_to_utf8($result,false);
+    
+    return $result;
 }
 
 /**
@@ -3442,7 +3453,11 @@ function check_theme_arrows() {
         // Also OK in Win 9x/2K/IE 5.x
         $THEME->rarrow = '&#x25BA;';
         $THEME->larrow = '&#x25C4;';
-        $uagent = $_SERVER['HTTP_USER_AGENT'];
+        if (empty($_SERVER['HTTP_USER_AGENT'])) {
+            $uagent = '';
+        } else {
+            $uagent = $_SERVER['HTTP_USER_AGENT'];
+        }
         if (false !== strpos($uagent, 'Opera')
             || false !== strpos($uagent, 'Mac')) {
             // Looks good in Win XP/Mac/Opera 8/9, Mac/Firefox 2, Camino, Safari.
@@ -4283,11 +4298,8 @@ function print_file_picture($path, $courseid=0, $height='', $width='', $link='',
 
     } else if ($courseid) {
         $output .= '<img style="height:'.$height.'px;width:'.$width.'px;" src="';
-        if ($CFG->slasharguments) {        // Use this method if possible for better caching
-            $output .= $CFG->wwwroot .'/file.php/'. $courseid .'/'. $path;
-        } else {
-            $output .= $CFG->wwwroot .'/file.php?file=/'. $courseid .'/'. $path;
-        }
+        require_once($CFG->libdir.'/filelib.php');
+        $output .= get_file_url("$courseid/$path");
         $output .= '" />';
     } else {
         $output .= 'Error: must pass URL or course';
@@ -4387,11 +4399,8 @@ function print_user_picture($user, $courseid, $picture=NULL, $size=0, $return=fa
     }
 
     if ($picture) {  // Print custom user picture
-        if ($CFG->slasharguments) {        // Use this method if possible for better caching
-            $src =  $wwwroot .'/user/pix.php/'. $user->id .'/'. $file .'.jpg';
-        } else {
-            $src =  $wwwroot .'/user/pix.php?file=/'. $user->id .'/'. $file .'.jpg';
-        }
+        require_once($CFG->libdir.'/filelib.php');
+        $src = get_file_url($user->id.'/'.$file.'.jpg', null, 'user');
     } else {         // Print default user pictures (use theme version if available)
         $class .= " defaultuserpic";
         $src =  "$CFG->pixpath/u/$file.png";
@@ -4593,13 +4602,10 @@ function print_group_picture($group, $courseid, $large=false, $return=false, $li
         $size = 35;
     }
     if ($group->picture) {  // Print custom group picture
-        if ($CFG->slasharguments) {        // Use this method if possible for better caching
-            $output .= '<img class="grouppicture" src="'.$CFG->wwwroot.'/user/pixgroup.php/'.$group->id.'/'.$file.'.jpg"'.
-                       ' style="width:'.$size.'px;height:'.$size.'px;" alt="'.s(get_string('group').' '.$group->name).'" title="'.s($group->name).'"/>';
-        } else {
-            $output .= '<img class="grouppicture" src="'.$CFG->wwwroot.'/user/pixgroup.php?file=/'.$group->id.'/'.$file.'.jpg"'.
-                       ' style="width:'.$size.'px;height:'.$size.'px;" alt="'.s(get_string('group').' '.$group->name).'" title="'.s($group->name).'"/>';
-        }
+        require_once($CFG->libdir.'/filelib.php');
+        $grouppictureurl = get_file_url($group->id.'/'.$file.'.jpg', null, 'usergroup');
+        $output .= '<img class="grouppicture" src="'.$grouppictureurl.'"'.
+            ' style="width:'.$size.'px;height:'.$size.'px;" alt="'.s(get_string('group').' '.$group->name).'" title="'.s($group->name).'"/>';
     }
     if ($link or has_capability('moodle/site:accessallgroups', $context)) {
         $output .= '</a>';
@@ -4734,6 +4740,7 @@ function print_table($table, $return=false) {
     if (!empty($table->head)) {
         $countcols = count($table->head);
         $output .= '<tr>';
+        $lastkey = end(array_keys($table->head));
         foreach ($table->head as $key => $heading) {
 
             if (!isset($size[$key])) {
@@ -4742,23 +4749,33 @@ function print_table($table, $return=false) {
             if (!isset($align[$key])) {
                 $align[$key] = '';
             }
+            if ($key == $lastkey) {
+                $extraclass = ' lastcol';
+            } else {
+                $extraclass = '';
+            }
 
-            $output .= '<th style="vertical-align:top;'. $align[$key].$size[$key] .';white-space:nowrap;" class="header c'.$key.'" scope="col">'. $heading .'</th>';
+            $output .= '<th style="vertical-align:top;'. $align[$key].$size[$key] .';white-space:nowrap;" class="header c'.$key.$extraclass.'" scope="col">'. $heading .'</th>';
         }
         $output .= '</tr>'."\n";
     }
 
     if (!empty($table->data)) {
         $oddeven = 1;
+        $lastrowkey = end(array_keys($table->data));
         foreach ($table->data as $key => $row) {
             $oddeven = $oddeven ? 0 : 1;
             if (!isset($table->rowclass[$key])) {
                 $table->rowclass[$key] = '';
             }
+            if ($key == $lastrowkey) {
+                $table->rowclass[$key] .= ' lastrow';
+            }
             $output .= '<tr class="r'.$oddeven.' '.$table->rowclass[$key].'">'."\n";
             if ($row == 'hr' and $countcols) {
                 $output .= '<td colspan="'. $countcols .'"><div class="tabledivider"></div></td>';
             } else {  /// it's a normal row of data
+            	$lastkey = end(array_keys($row));
                 foreach ($row as $key => $item) {
                     if (!isset($size[$key])) {
                         $size[$key] = '';
@@ -4769,7 +4786,12 @@ function print_table($table, $return=false) {
                     if (!isset($wrap[$key])) {
                         $wrap[$key] = '';
                     }
-                    $output .= '<td style="'. $align[$key].$size[$key].$wrap[$key] .'" class="cell c'.$key.'">'. $item .'</td>';
+                    if ($key == $lastkey) {
+                    	$extraclass = ' lastcol';
+                    } else {
+                    	$extraclass = '';
+                    }
+                    $output .= '<td style="'. $align[$key].$size[$key].$wrap[$key] .'" class="cell c'.$key.$extraclass.'">'. $item .'</td>';
                 }
             }
             $output .= '</tr>'."\n";
@@ -5833,6 +5855,13 @@ function helpbutton ($page, $title, $module='moodle', $image=true, $linktext=fal
                      $imagetext='') {
     global $CFG, $COURSE;
 
+    //warning if ever $text parameter is used
+    //$text option won't work properly because the text needs to be always cleaned and,
+    // when cleaned... html tags always break, so it's unusable.
+    if ( isset($text) && $text!='') {
+      debugging('Warning: it\'s not recommended to use $text parameter in helpbutton ($page=' . $page . ', $module=' . $module . ') function', DEBUG_DEVELOPER);
+    }
+    
     // fix for MDL-7734
     if (!empty($COURSE->lang)) {
         $forcelang = $COURSE->lang;
@@ -6865,7 +6894,7 @@ function debugging($message='', $level=DEBUG_NORMAL) {
             }
             $from .= '</ul>';
             if (!isset($CFG->debugdisplay)) {
-                $CFG->debugdisplay = ini_get('display_errors');
+                $CFG->debugdisplay = ini_get_bool('display_errors');
             }
             if ($CFG->debugdisplay) {
                 if (!defined('DEBUGGING_PRINTED')) {

@@ -33,6 +33,10 @@ define('QUESTION_EVENTCLOSEANDGRADE', '6'); // Moodle has graded the responses. 
 define('QUESTION_EVENTSUBMIT', '7');    // The student response has been submitted but it has not yet been marked
 define('QUESTION_EVENTCLOSE', '8');     // The response has been submitted and the session has been closed, either because the student requested it or because Moodle did it (e.g. because of a timelimit). The responses have not been graded.
 define('QUESTION_EVENTMANUALGRADE', '9');   // Grade was entered by teacher
+
+define('QUESTION_EVENTS_GRADED', QUESTION_EVENTGRADE.','.
+                    QUESTION_EVENTCLOSEANDGRADE.','.
+                    QUESTION_EVENTMANUALGRADE);
 /**#@-*/
 
 /**#@+
@@ -165,7 +169,7 @@ foreach($qtypenames as $qtypename) {
  * Long-time Moodle programmers will realise that this replaces the old $QTYPE_MENU array.
  * The array returned will only hold the names of all the question types that the user should
  * be able to create directly. Some internal question types like random questions are excluded.
- * 
+ *
  * @return array an array of question type names translated to the user's language.
  */
 function question_type_menu() {
@@ -561,7 +565,7 @@ function question_delete_course_category($category, $newcategory, $feedback=true
         // Loop over question categories.
         if ($categories = get_records('question_categories', 'contextid', $context->id, 'parent', 'id, parent, name')) {
             foreach ($categories as $category) {
-    
+
                 // Deal with any questions in the category.
                 if ($questions = get_records('question', 'category', $category->id)) {
 
@@ -625,9 +629,9 @@ function question_delete_course_category($category, $newcategory, $feedback=true
  *
  * @param string $questionids list of questionids
  * @param object $newcontext the context to create the saved category in.
- * @param string $oldplace a textual description of the think being deleted, e.g. from get_context_name 
+ * @param string $oldplace a textual description of the think being deleted, e.g. from get_context_name
  * @param object $newcategory
- * @return mixed false on 
+ * @return mixed false on
  */
 function question_save_from_deletion($questionids, $newcontextid, $oldplace, $newcategory = null) {
     // Make a category in the parent context to move the questions to.
@@ -1024,9 +1028,8 @@ function save_question_session(&$question, &$state) {
 * @param object $state
 */
 function question_state_is_graded($state) {
-    return ($state->event == QUESTION_EVENTGRADE
-         or $state->event == QUESTION_EVENTCLOSEANDGRADE
-         or $state->event == QUESTION_EVENTMANUALGRADE);
+    $gradedevents = explode(',', QUESTION_EVENTS_GRADED);
+    return (in_array($state->event, $gradedevents));
 }
 
 /**
@@ -1216,8 +1219,19 @@ function regrade_question_in_attempt($question, $attempt, $cmoptions, $verbose=f
             }
 
             if ($action->event == QUESTION_EVENTMANUALGRADE) {
-                question_process_comment($question, $replaystate, $attempt,
+                // Ensure that the grade is in range - in the past this was not checked,
+                // but now it is (MDL-14835) - so we need to ensure the data is valid before
+                // proceeding.
+                if ($states[$j]->grade < 0) {
+                    $states[$j]->grade = 0;
+                } else if ($states[$j]->grade > $question->maxgrade) {
+                    $states[$j]->grade = $question->maxgrade;
+                }
+                $error = question_process_comment($question, $replaystate, $attempt,
                         $replaystate->manualcomment, $states[$j]->grade);
+                if (is_string($error)) {
+                     notify($error);
+                }
             } else {
 
                 // Reprocess (regrade) responses
@@ -1254,7 +1268,6 @@ function regrade_question_in_attempt($question, $attempt, $cmoptions, $verbose=f
 /**
 * Processes an array of student responses, grading and saving them as appropriate
 *
-* @return boolean         Indicates success/failure
 * @param object $question Full question object, passed by reference
 * @param object $state    Full state object, passed by reference
 * @param object $action   object with the fields ->responses which
@@ -1265,6 +1278,7 @@ function regrade_question_in_attempt($question, $attempt, $cmoptions, $verbose=f
 * @param object $cmoptions
 * @param object $attempt  The attempt is passed by reference so that
 *                         during grading its ->sumgrades field can be updated
+* @return boolean         Indicates success/failure
 */
 function question_process_responses(&$question, &$state, $action, $cmoptions, &$attempt) {
     global $QTYPES;
@@ -1325,7 +1339,9 @@ function question_process_responses(&$question, &$state, $action, $cmoptions, &$
 
     if (!question_isgradingevent($action->event)) {
         // Grade the response but don't update the overall grade
-        $QTYPES[$question->qtype]->grade_responses($question, $state, $cmoptions);
+        if (!$QTYPES[$question->qtype]->grade_responses($question, $state, $cmoptions)) {
+            return false;
+        }
 
         // Temporary hack because question types are not given enough control over what is going
         // on. Used by Opaque questions.
@@ -1361,8 +1377,10 @@ function question_process_responses(&$question, &$state, $action, $cmoptions, &$
         // If we did not find a duplicate or if the attempt is closing, perform grading
         if ((!$sameresponses and QUESTION_EVENTDUPLICATE != $state->event) or
                 QUESTION_EVENTCLOSE == $action->event) {
+            if (!$QTYPES[$question->qtype]->grade_responses($question, $state, $cmoptions)) {
+                return false;
+            }
 
-            $QTYPES[$question->qtype]->grade_responses($question, $state, $cmoptions);
             // Calculate overall grade using correct penalty method
             question_apply_penalty_and_timelimit($question, $state, $attempt, $cmoptions);
         }
@@ -1485,12 +1503,10 @@ function get_question_image($question) {
         if (substr(strtolower($question->image), 0, 7) == 'http://') {
             $img .= $question->image;
 
-        } else if ($CFG->slasharguments) {        // Use this method if possible for better caching
-            $img .= "$CFG->wwwroot/file.php/$coursefilesdir/$question->image";
-
         } else {
-            $img .= "$CFG->wwwroot/file.php?file=/$coursefilesdir/$question->image";
-        }
+            require_once($CFG->libdir .'/filelib.php');
+            $img = get_file_url("$courseid/{$question->image}");
+        }      
     }
     return $img;
 }
@@ -1514,13 +1530,34 @@ function question_print_comment_box($question, $state, $attempt, $url) {
    }
 }
 
+/**
+ * Process a manual grading action. That is, use $comment and $grade to update
+ * $state and $attempt. The attempt and the comment text are stored in the
+ * database. $state is only updated in memory, it is up to the call to store
+ * that, if appropriate.
+ *
+ * @param object $question the question
+ * @param object $state the state to be updated.
+ * @param object $attempt the attempt the state belongs to, to be updated.
+ * @param string $comment the comment the teacher added
+ * @param float $grade the grade the teacher assigned.
+ * @return mixed true on success, a string error message if a problem is detected
+ *         (for example score out of range).
+ */
 function question_process_comment($question, &$state, &$attempt, $comment, $grade) {
+    if ($grade < 0 || $grade > $question->maxgrade) {
+        $a = new stdClass;
+        $a->grade = $grade;
+        $a->maxgrade = $question->maxgrade;
+        $a->name = $question->name;
+        return get_string('errormanualgradeoutofrange', 'question', $a);
+    }
 
     // Update the comment and save it in the database
     $comment = trim($comment);
     $state->manualcomment = $comment;
     if (!set_field('question_sessions', 'manualcomment', $comment, 'attemptid', $attempt->uniqueid, 'questionid', $question->id)) {
-        error("Cannot save comment");
+        return get_string('errorsavingcomment', 'question', $question);
     }
 
     // Update the attempt if the score has changed.
@@ -1528,7 +1565,7 @@ function question_process_comment($question, &$state, &$attempt, $comment, $grad
         $attempt->sumgrades = $attempt->sumgrades - $state->last_graded->grade + $grade;
         $attempt->timemodified = time();
         if (!update_record('quiz_attempts', $attempt)) {
-            error('Failed to save the current quiz attempt!');
+            return get_string('errorupdatingattempt', 'question', $attempt);
         }
     }
 
@@ -1559,6 +1596,7 @@ function question_process_comment($question, &$state, &$attempt, $comment, $grad
         $state->changed = 1;
     }
 
+    return true;
 }
 
 /**
@@ -2125,6 +2163,11 @@ class context_to_string_translator{
  */
 function question_has_capability_on($question, $cap, $cachecat = -1){
     global $USER;
+    // nicolasconnault@gmail.com In some cases I get $question === false. Since no such object exists, it can't be deleted, we can safely return true
+    if ($question === false) {
+        return true;
+    }
+
     // these are capabilities on existing questions capabilties are
     //set per category. Each of these has a mine and all version. Append 'mine' and 'all'
     $question_questioncaps = array('edit', 'view', 'use', 'move');
@@ -2245,12 +2288,8 @@ function question_url_check($url){
  */
 function question_replace_file_links_in_html($html, $fromcourseid, $tocourseid, $url, $destination, &$changed){
     global $CFG;
-    if ($CFG->slasharguments) {        // Use this method if possible for better caching
-        $tourl = "$CFG->wwwroot/file.php/$tocourseid/$destination";
-
-    } else {
-        $tourl = "$CFG->wwwroot/file.php?file=/$tocourseid/$destination";
-    }
+    require_once($CFG->libdir .'/filelib.php');
+    $tourl = get_file_url("$tocourseid/$destination");
     $fromurl = question_file_links_base_url($fromcourseid).preg_quote($url, '!');
     $searchfor = array('!(<\s*(a|img)\s[^>]*(href|src)\s*=\s*")'.$fromurl.'(")!i',
                    '!(<\s*(a|img)\s[^>]*(href|src)\s*=\s*\')'.$fromurl.'(\')!i');

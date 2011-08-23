@@ -143,6 +143,8 @@ class graph {
     'thousand_sep'       => ',',           // symbol for thousand separation ',' or ''
 
   );
+  var $y_tick_labels     =   null;         // array of text values for y-axis tick labels
+  var $offset_relation   =   null;         // array of offsets for different sets of data
 
 
 
@@ -979,7 +981,7 @@ function init_y_axis() {
   $axis_colour     = $this->parameter['axis_colour'];
   $axis_angle      = $this->parameter['y_axis_angle'];
   $y_tick_labels   = $this->y_tick_labels;
-
+  
   $this->calculated['y_axis_left']['has_data'] = FALSE;
   $this->calculated['y_axis_right']['has_data'] = FALSE;
 

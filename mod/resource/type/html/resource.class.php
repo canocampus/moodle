@@ -50,6 +50,15 @@ function display() {
     $formatoptions = new object();
     $formatoptions->noclean = true;
 
+    /// Set up some shorthand variables
+    $cm = $this->cm;
+    $course = $this->course;
+    $resource = $this->resource;
+
+    // fix for MDL-9021, thanks Etienne Roz
+    // fix for MDL-15387, thanks to John Beedell
+    add_to_log($course->id, "resource", "view", "view.php?id={$cm->id}", $resource->id, $cm->id);
+
     /// Are we displaying the course blocks?
     if ($this->resource->options == 'showblocks') {
 
@@ -64,17 +73,9 @@ function display() {
         /// Set up generic stuff first, including checking for access
         parent::display();
 
-        /// Set up some shorthand variables
-        $cm = $this->cm;
-        $course = $this->course;
-        $resource = $this->resource;
-
         $pagetitle = strip_tags($course->shortname.': '.format_string($resource->name));
         $inpopup = optional_param('inpopup', '', PARAM_BOOL);
         
-        // fix for MDL-9021, thanks Etienne Roz
-        add_to_log($course->id, "resource", "view", "view.php?id={$cm->id}", $resource->id, $cm->id);
-
         if ($resource->popup) {
             if ($inpopup) {                    /// Popup only
                 

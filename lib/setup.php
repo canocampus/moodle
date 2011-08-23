@@ -158,9 +158,24 @@ global $HTTPSPAGEREQUIRED;
         error_log('ADODB Error: '.$db->ErrorMsg()); // see MDL-14628
 
         if (empty($CFG->noemailever) and !empty($CFG->emailconnectionerrorsto)) {
-            mail($CFG->emailconnectionerrorsto, 
-                 'WARNING: Database connection error: '.$CFG->wwwroot, 
-                 'Connection error: '.$CFG->wwwroot);
+            if (file_exists($CFG->dataroot.'/emailcount')){
+                $fp = fopen($CFG->dataroot.'/emailcount', 'r');
+                $content = fread($fp, 24);
+                fclose($fp);
+                if((time() - (int)$content) > 600){
+                    mail($CFG->emailconnectionerrorsto, 
+                        'WARNING: Database connection error: '.$CFG->wwwroot, 
+                        'Connection error: '.$CFG->wwwroot);
+                    $fp = fopen($CFG->dataroot.'/emailcount', 'w');
+                    fwrite($fp, time());
+                }
+            } else {
+               mail($CFG->emailconnectionerrorsto, 
+                    'WARNING: Database connection error: '.$CFG->wwwroot, 
+                    'Connection error: '.$CFG->wwwroot);
+               $fp = fopen($CFG->dataroot.'/emailcount', 'w');
+               fwrite($fp, time());
+            }
         }
         die;
     }
@@ -275,6 +290,10 @@ global $HTTPSPAGEREQUIRED;
     error_reporting($CFG->debug);
 
 
+/// find out if PHP cofigured to display warnings
+    if (ini_get_bool('display_errors')) {
+        define('WARN_DISPLAY_ERRORS_ENABLED', true);
+    }
 /// If we want to display Moodle errors, then try and set PHP errors to match
     if (!isset($CFG->debugdisplay)) {
         //keep it as is during installation

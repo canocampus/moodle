@@ -620,7 +620,7 @@ function forum_cron() {
                 foreach ($CFG->stylesheets as $stylesheet) {
                     $posthtml .= '<link rel="stylesheet" type="text/css" href="'.$stylesheet.'" />'."\n";
                 }
-                $posthtml .= "</head>\n<body>\n";
+                $posthtml .= "</head>\n<body id=\"email\">\n";
                 $posthtml .= '<p>'.get_string('digestmailheader', 'forum', $headerdata).'</p><br /><hr size="1" noshade="noshade" />';
 
                 foreach ($thesediscussions as $discussionid) {
@@ -900,8 +900,9 @@ function forum_make_mail_html($course, $forum, $discussion, $post, $userfrom, $u
     $posthtml .= forum_make_mail_post($course, $forum, $discussion, $post, $userfrom, $userto, false, $canreply, true, false);
 
     if ($canunsubscribe) {
-        $posthtml .= '<hr /><div align="center" class="unsubscribelink"><a href="'.$CFG->wwwroot.'/mod/forum/subscribe.php?id='.$forum->id.'">'.
-                     get_string('unsubscribe', 'forum').'</a></div>';
+        $posthtml .= '<hr /><div align="center" class="unsubscribelink">
+                      <a href="'.$CFG->wwwroot.'/mod/forum/subscribe.php?id='.$forum->id.'">'.get_string('unsubscribe', 'forum').'</a>&nbsp;
+                      <a href="'.$CFG->wwwroot.'/mod/forum/unsubscribeall.php">'.get_string('unsubscribeall', 'forum').'</a></div>';
     }
 
     $posthtml .= '</body>';
@@ -3636,11 +3637,7 @@ function forum_print_attachments($post, $return=NULL) {
             foreach ($files as $file) {
                 $icon = mimeinfo("icon", $file);
                 $type = mimeinfo("type", $file);
-                if ($CFG->slasharguments) {
-                    $ffurl = "$CFG->wwwroot/file.php/$filearea/$file";
-                } else {
-                    $ffurl = "$CFG->wwwroot/file.php?file=/$filearea/$file";
-                }
+                $ffurl = get_file_url("$filearea/$file");
                 $image = "<img src=\"$CFG->pixpath/f/$icon\" class=\"icon\" alt=\"\" />";
 
                 if ($return == "html") {
@@ -4190,7 +4187,19 @@ function forum_discussions_user_has_posted_in($forumid, $userid) {
  *
  */
 function forum_user_has_posted($forumid, $did, $userid) {
-    return record_exists('forum_posts','discussion',$did,'userid',$userid);
+    global $CFG;
+
+    if (empty($did)) {
+        // posted in any forum discussion?
+        $sql = "SELECT 'x'
+                  FROM {$CFG->prefix}forum_posts p
+                  JOIN {$CFG->prefix}forum_discussions d ON d.id = p.discussion
+                 WHERE p.userid = $userid AND d.forum = $forumid";
+        return record_exists_sql($sql);
+    } else {
+        // started discussion?
+        return record_exists('forum_posts','discussion',$did,'userid',$userid);
+    }
 }
 
 /**

@@ -403,6 +403,9 @@ class auth_plugin_ldap extends auth_plugin_base {
         $this->update_user_record($user->username);
         update_internal_user_password($user, $plainslashedpassword);
 
+        $user = get_record('user', 'id', $user->id);
+        events_trigger('user_created', $user);
+
         if (! send_confirmation_email($user)) {
             print_error('auth_emailnoemail', 'auth');
         }
@@ -1096,6 +1099,7 @@ class auth_plugin_ldap extends auth_plugin_base {
                     }
 
                     $nuvalue = $textlib->convert($newuser->$key, 'utf-8', $this->config->ldapencoding);
+                    empty($nuvalue) ? $nuvalue = array() : $nuvalue;
                     $ouvalue = $textlib->convert($olduser->$key, 'utf-8', $this->config->ldapencoding);
 
                     foreach ($ldapkeys as $ldapkey) {
@@ -1362,7 +1366,7 @@ class auth_plugin_ldap extends auth_plugin_base {
                             'rfc2307' => 'shadowExpire',
                             'rfc2307bis' => 'shadowExpire',
                             'samba' => '', //No support yet
-                            'ad' => '', //No support yet
+                            'ad' => 'pwdLastSet',
                             'default' => ''
                             );
         return $default;

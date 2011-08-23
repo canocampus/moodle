@@ -190,13 +190,8 @@ class question_shortanswer_qtype extends default_questiontype {
 
     function compare_responses($question, $state, $teststate) {
         if (isset($state->responses['']) && isset($teststate->responses[''])) {
-            if ($question->options->usecase) {
-                return strcmp($state->responses[''], $teststate->responses['']) == 0;
-            } else {
-                $textlib = textlib_get_instance();
-                return strcmp($textlib->strtolower($state->responses['']),
-                        $textlib->strtolower($teststate->responses[''])) == 0;
-            }
+            return $this->compare_string_with_wildcard(stripslashes_safe($state->responses['']),
+                $teststate->responses[''], !$question->options->usecase);
         }
         return false;
     }
@@ -439,6 +434,34 @@ class question_shortanswer_qtype extends default_questiontype {
                 echo '</div>';
             }
         }
+    }
+
+    /**
+     * Runs all the code required to set up and save an essay question for testing purposes.
+     * Alternate DB table prefix may be used to facilitate data deletion.
+     */
+    function generate_test($name, $courseid = null) {
+        list($form, $question) = parent::generate_test($name, $courseid);
+        $question->category = $form->category;
+
+        $form->questiontext = "What is the purpose of life, the universe, and everything";
+        $form->generalfeedback = "Congratulations, you may have solved my biggest problem!";
+        $form->penalty = 0.1;
+        $form->usecase = false;
+        $form->defaultgrade = 1;
+        $form->noanswers = 3;
+        $form->answer = array('42', 'who cares?', 'Be happy');
+        $form->fraction = array(1, 0.6, 0.8);
+        $form->feedback = array('True, but what does that mean?', 'Well you do, dont you?', 'Yes, but thats not funny...');
+        $form->correctfeedback = 'Excellent!';
+        $form->incorrectfeedback = 'Nope!';
+        $form->partiallycorrectfeedback = 'Not bad';
+
+        if ($courseid) {
+            $course = get_record('course', 'id', $courseid);
+        }
+
+        return $this->save_question($question, $form, $course);
     }
 }
 //// END OF CLASS ////

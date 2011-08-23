@@ -22,33 +22,35 @@
 //                                                                       //
 ///////////////////////////////////////////////////////////////////////////
 
-/// Some constants
+// Some constants
 define ('DATA_MAX_ENTRIES', 50);
 define ('DATA_PERPAGE_SINGLE', 1);
-
 define ('DATA_FIRSTNAME', -1);
 define ('DATA_LASTNAME', -2);
 define ('DATA_APPROVED', -3);
 define ('DATA_TIMEADDED', 0);
 define ('DATA_TIMEMODIFIED', -4);
 
-class data_field_base {     /// Base class for Database Field Types (see field/*/field.class.php)
+define ('DATA_CAP_EXPORT', 'mod/data:viewalluserpresets');
+// Users having assigned the default role "Non-editing teacher" can export database records
+// Using the mod/data capability "viewalluserpresets" for Moodle 1.9.x, so no change in the role system is required.
+// In Moodle >= 2, new roles may be introduced and used instead. 
 
-    var $type = 'unknown';  /// Subclasses must override the type with their name
-    var $data = NULL;       /// The database object that this field belongs to
-    var $field = NULL;      /// The field object itself, if we know it
+class data_field_base {     // Base class for Database Field Types (see field/*/field.class.php)
 
-    var $iconwidth = 16;    /// Width of the icon for this fieldtype
-    var $iconheight = 16;   /// Width of the icon for this fieldtype
+    var $type = 'unknown';  // Subclasses must override the type with their name
+    var $data = NULL;       // The database object that this field belongs to
+    var $field = NULL;      // The field object itself, if we know it
+
+    var $iconwidth = 16;    // Width of the icon for this fieldtype
+    var $iconheight = 16;   // Width of the icon for this fieldtype
 
 
-/// Constructor function
+// Constructor function
     function data_field_base($field=0, $data=0) {   // Field or data or both, each can be id or object
-
         if (empty($field) && empty($data)) {
             error('Programmer error: You must specify field and/or data when defining field class. ');
         }
-
         if (!empty($field)) {
             if (is_object($field)) {
                 $this->field = $field;  // Programmer knows what they are doing, we hope
@@ -61,7 +63,6 @@ class data_field_base {     /// Base class for Database Field Types (see field/*
                 }
             }
         }
-
         if (empty($this->data)) {         // We need to define this properly
             if (!empty($data)) {
                 if (is_object($data)) {
@@ -73,14 +74,13 @@ class data_field_base {     /// Base class for Database Field Types (see field/*
                 error('Data id or object must be provided to field class');
             }
         }
-
         if (empty($this->field)) {         // We need to define some default values
             $this->define_default_field();
         }
     }
 
 
-/// This field just sets up a default field object
+// This field just sets up a default field object
     function define_default_field() {
         if (empty($this->data->id)) {
             notify('Programmer error: dataid not defined in field class');
@@ -94,11 +94,10 @@ class data_field_base {     /// Base class for Database Field Types (see field/*
         $this->field->param3 = '';
         $this->field->name = '';
         $this->field->description = '';
-
         return true;
     }
 
-/// Set up the field object according to data in an object.  Now is the time to clean it!
+// Set up the field object according to data in an object. Now is the time to clean it!
     function define_field($data) {
         $this->field->type        = $this->type;
         $this->field->dataid      = $this->data->id;
@@ -125,8 +124,8 @@ class data_field_base {     /// Base class for Database Field Types (see field/*
         return true;
     }
 
-/// Insert a new field in the database
-/// We assume the field object is already defined as $this->field
+// Insert a new field in the database
+// We assume the field object is already defined as $this->field
     function insert_field() {
         if (empty($this->field)) {
             notify('Programmer error: Field has not been defined yet!  See define_field()');
@@ -141,7 +140,7 @@ class data_field_base {     /// Base class for Database Field Types (see field/*
     }
 
 
-/// Update a field in the database
+// Update a field in the database
     function update_field() {
         if (!update_record('data_fields', $this->field)) {
             notify('updating of new field failed!');
@@ -150,7 +149,7 @@ class data_field_base {     /// Base class for Database Field Types (see field/*
         return true;
     }
 
-/// Delete a field completely
+// Delete a field completely
     function delete_field() {
         if (!empty($this->field->id)) {
             delete_records('data_fields', 'id', $this->field->id);
@@ -159,7 +158,7 @@ class data_field_base {     /// Base class for Database Field Types (see field/*
         return true;
     }
 
-/// Print the relevant form element in the ADD template for this field
+// Print the relevant form element in the ADD template for this field
     function display_add_field($recordid=0){
         if ($recordid){
             $content = get_field('data_content', 'content', 'fieldid', $this->field->id, 'recordid', $recordid);
@@ -174,8 +173,8 @@ class data_field_base {     /// Base class for Database Field Types (see field/*
         return $str;
     }
 
-/// Print the relevant form element to define the attributes for this field
-/// viewable by teachers only.
+// Print the relevant form element to define the attributes for this field
+// viewable by teachers only.
     function display_edit_field() {
         global $CFG;
 
@@ -211,7 +210,7 @@ class data_field_base {     /// Base class for Database Field Types (see field/*
         print_simple_box_end();
     }
 
-/// Display the content of the field in browse mode
+// Display the content of the field in browse mode
     function display_browse_field($recordid, $template) {
         if ($content = get_record('data_content','fieldid', $this->field->id, 'recordid', $recordid)) {
             if (isset($content->content)) {
@@ -231,8 +230,8 @@ class data_field_base {     /// Base class for Database Field Types (see field/*
         return false;
     }
 
-/// Update the content of one data field in the data_content table
-    function update_content($recordid, $value, $name=''){
+// Update the content of one data field in the data_content table
+    function update_content($recordid, $value, $name='') {
         $content = new object();
         $content->fieldid = $this->field->id;
         $content->recordid = $recordid;
@@ -246,7 +245,7 @@ class data_field_base {     /// Base class for Database Field Types (see field/*
         }
     }
 
-/// Delete all content associated with the field
+// Delete all content associated with the field
     function delete_content($recordid=0) {
 
         $this->delete_content_files($recordid);
@@ -258,7 +257,7 @@ class data_field_base {     /// Base class for Database Field Types (see field/*
         }
     }
 
-/// Deletes any files associated with this field
+// Deletes any files associated with this field
     function delete_content_files($recordid='') {
         global $CFG;
 
@@ -273,37 +272,37 @@ class data_field_base {     /// Base class for Database Field Types (see field/*
     }
 
 
-/// Check if a field from an add form is empty
+// Check if a field from an add form is empty
     function notemptyfield($value, $name) {
         return !empty($value);
     }
 
-/// Just in case a field needs to print something before the whole form
+// Just in case a field needs to print something before the whole form
     function print_before_form() {
     }
 
-/// Just in case a field needs to print something after the whole form
+// Just in case a field needs to print something after the whole form
     function print_after_form() {
     }
 
 
-/// Returns the sortable field for the content. By default, it's just content
-/// but for some plugins, it could be content 1 - content4
+// Returns the sortable field for the content. By default, it's just content
+// but for some plugins, it could be content 1 - content4
     function get_sort_field() {
         return 'content';
     }
 
-/// Returns the SQL needed to refer to the column.  Some fields may need to CAST() etc.
+// Returns the SQL needed to refer to the column.  Some fields may need to CAST() etc.
     function get_sort_sql($fieldname) {
         return $fieldname;
     }
 
-/// Returns the name/type of the field
-    function name(){
+// Returns the name/type of the field
+    function name() {
         return get_string('name'.$this->type, 'data');
     }
 
-/// Prints the respective type icon
+// Prints the respective type icon
     function image() {
         global $CFG;
 
@@ -313,17 +312,27 @@ class data_field_base {     /// Base class for Database Field Types (see field/*
         return $str;
     }
 
+//  Per default, it is assumed that fields support text exporting. Override this (return false) on fields not supporting text exporting. 
+    function text_export_supported() {
+        return true;
+    }
 
-}  //end of major class data_field_base
+//  Per default, return the record's text value only from the "content" field. Override this in fields class if necesarry. 
+    function export_text_value($record) {
+        if ($this->text_export_supported()) {
+            return $record->content;
+        }
+    }
+
+}
 
 
-
-/*****************************************************************************
-/* Given a template and a dataid, generate a default case template               *
- * input @param template - addtemplate, singletemplate, listtempalte, rsstemplate*
- *       @param dataid                                                       *
- * output null                                                               *
- *****************************************************************************/
+/*
+/* Given a template and a dataid, generate a default case template
+ * input @param template - addtemplate, singletemplate, listtempalte, rsstemplate
+ *       @param dataid
+ * output null
+ */
 function data_generate_default_template(&$data, $template, $recordid=0, $form=false, $update=true) {
 
     if (!$data && !$template) {
@@ -333,7 +342,7 @@ function data_generate_default_template(&$data, $template, $recordid=0, $form=fa
         return '';
     }
 
-    //get all the fields for that database
+    // get all the fields for that database
     if ($fields = get_records('data_fields', 'dataid', $data->id, 'id')) {
 
         $str = '<div class="defaulttemplate">';
@@ -356,11 +365,11 @@ function data_generate_default_template(&$data, $template, $recordid=0, $form=fa
             $str .= '</td>';
 
             $str .='<td>';
-            if ($form) {   /// Print forms instead of data
+            if ($form) {   // Print forms instead of data
                 $fieldobj = data_get_field($field, $data);
                 $str .= $fieldobj->display_add_field($recordid);
 
-            } else {           /// Just print the tag
+            } else {           // Just print the tag
                 $str .= '[['.$field->name.']]';
             }
             $str .= '</td></tr>';
@@ -464,12 +473,11 @@ function data_append_new_field_to_templates($data, $newfieldname) {
 
 
 /************************************************************************
- * given a field name *
+ * given a field name                                                   *
  * this function creates an instance of the particular subfield class   *
  ************************************************************************/
 function data_get_field_from_name($name, $data){
     $field = get_record('data_fields','name',$name);
-
     if ($field) {
         return data_get_field($field, $data);
     } else {
@@ -478,12 +486,11 @@ function data_get_field_from_name($name, $data){
 }
 
 /************************************************************************
- * given a field id *
+ * given a field id                                                     *
  * this function creates an instance of the particular subfield class   *
  ************************************************************************/
-function data_get_field_from_id($fieldid, $data){
+function data_get_field_from_id($fieldid, $data) {
     $field = get_record('data_fields','id',$fieldid);
-
     if ($field) {
         return data_get_field($field, $data);
     } else {
@@ -492,12 +499,11 @@ function data_get_field_from_id($fieldid, $data){
 }
 
 /************************************************************************
- * given a field id *
+ * given a field id                                                     *
  * this function creates an instance of the particular subfield class   *
  ************************************************************************/
 function data_get_field_new($type, $data) {
     global $CFG;
-
     require_once($CFG->dirroot.'/mod/data/field/'.$type.'/field.class.php');
     $newfield = 'data_field_'.$type;
     $newfield = new $newfield(0, $data);
@@ -511,7 +517,6 @@ function data_get_field_new($type, $data) {
  ************************************************************************/
 function data_get_field($field, $data) {
     global $CFG;
-
     if ($field) {
         require_once('field/'.$field->type.'/field.class.php');
         $newfield = 'data_field_'.$field->type;
@@ -528,7 +533,6 @@ function data_get_field($field, $data) {
  ***************************************************************************/
 function data_isowner($rid){
     global $USER;
-
     if (empty($USER->id)) {
         return false;
     }
@@ -545,10 +549,9 @@ function data_isowner($rid){
  * input object $data                                                  *
  * output bool                                                         *
  ***********************************************************************/
-function data_atmaxentries($data){
-    if (!$data->maxentries){
+function data_atmaxentries($data) {
+    if (!$data->maxentries) {
         return false;
-
     } else {
         return (data_numentries($data) >= $data->maxentries);
     }
@@ -560,7 +563,7 @@ function data_atmaxentries($data){
  * uses global $CFG, $USER                                            *
  * output int                                                         *
  **********************************************************************/
-function data_numentries($data){
+function data_numentries($data) {
     global $USER;
     global $CFG;
     $sql = 'SELECT COUNT(*) FROM '.$CFG->prefix.'data_records WHERE dataid='.$data->id.' AND userid='.$USER->id;
@@ -573,12 +576,10 @@ function data_numentries($data){
  * input @param int $dataid, $groupid                           *
  * output bool                                                  *
  ****************************************************************/
-function data_add_record($data, $groupid=0){
+function data_add_record($data, $groupid=0) {
     global $USER;
-
     $cm = get_coursemodule_from_instance('data', $data->id);
     $context = get_context_instance(CONTEXT_MODULE, $cm->id);
-
     $record = new object();
     $record->userid = $USER->id;
     $record->dataid = $data->id;
@@ -601,19 +602,19 @@ function data_add_record($data, $groupid=0){
  *       @param string $template                                   *
  * output bool                                                     *
  *******************************************************************/
-function data_tags_check($dataid, $template){
-    //first get all the possible tags
+function data_tags_check($dataid, $template) {
+    // first get all the possible tags
     $fields = get_records('data_fields','dataid',$dataid);
-    ///then we generate strings to replace
-    $tagsok = true; //let's be optimistic
-    foreach ($fields as $field){
+    // then we generate strings to replace
+    $tagsok = true; // let's be optimistic
+    foreach ($fields as $field) {
         $pattern="/\[\[".$field->name."\]\]/i";
-        if (preg_match_all($pattern, $template, $dummy)>1){
+        if (preg_match_all($pattern, $template, $dummy)>1) {
             $tagsok = false;
             notify ('[['.$field->name.']] - '.get_string('multipletags','data'));
         }
     }
-    //else return true
+    // else return true
     return $tagsok;
 }
 
@@ -622,20 +623,17 @@ function data_tags_check($dataid, $template){
  ************************************************************************/
 function data_add_instance($data) {
     global $CFG;
-
     if (empty($data->assessed)) {
         $data->assessed = 0;
     }
 
     $data->timemodified = time();
-
     if (! $data->id = insert_record('data', $data)) {
         return false;
     }
 
     $data = stripslashes_recursive($data);
     data_grade_item_update($data);
-
     return $data->id;
 }
 
@@ -644,52 +642,43 @@ function data_add_instance($data) {
  ************************************************************************/
 function data_update_instance($data) {
     global $CFG;
-
     $data->timemodified = time();
-    $data->id           = $data->instance;
+    $data->id = $data->instance;
 
     if (empty($data->assessed)) {
         $data->assessed = 0;
     }
-
     if (empty($data->notification)) {
         $data->notification = 0;
     }
-
     if (! update_record('data', $data)) {
         return false;
     }
 
     $data = stripslashes_recursive($data);
     data_grade_item_update($data);
-
     return true;
-
 }
 
 /************************************************************************
  * deletes an instance of a data                                        *
  ************************************************************************/
-function data_delete_instance($id) {    //takes the dataid
+function data_delete_instance($id) {    // takes the dataid
 
     global $CFG;
-
     if (! $data = get_record('data', 'id', $id)) {
         return false;
     }
 
-    /// Delete all the associated information
-
+    // Delete all the associated information
     // get all the records in this data
     $sql = 'SELECT c.* FROM '.$CFG->prefix.'data_records r LEFT JOIN '.
            $CFG->prefix.'data_content c ON c.recordid = r.id WHERE r.dataid = '.$id;
 
-    if ($contents = get_records_sql($sql)){
-
-        foreach($contents as $content){
-
+    if ($contents = get_records_sql($sql)) {
+        foreach($contents as $content) {
             $field = get_record('data_fields','id',$content->fieldid);
-            if ($g = data_get_field($field, $data)){
+            if ($g = data_get_field($field, $data)) {
                 $g->delete_content_files($id, $content->recordid, $content->content);
             }
             //delete the content itself
@@ -702,11 +691,8 @@ function data_delete_instance($id) {    //takes the dataid
     delete_records('data_fields','dataid',$id);
 
     // Delete the instance itself
-
     $result = delete_records('data', 'id', $id);
-
     data_grade_item_delete($data);
-
     return $result;
 }
 
@@ -714,9 +700,7 @@ function data_delete_instance($id) {    //takes the dataid
  * returns a summary of data activity of this user                      *
  ************************************************************************/
 function data_user_outline($course, $user, $mod, $data) {
-
     global $CFG;
-
     if ($countrecords = count_records('data_records', 'dataid', $data->id, 'userid', $user->id)) {
         $result = new object();
         $result->info = get_string('numrecords', 'data', $countrecords);
@@ -727,19 +711,15 @@ function data_user_outline($course, $user, $mod, $data) {
         return $result;
     }
     return NULL;
-
 }
 
 /************************************************************************
  * Prints all the records uploaded by this user                         *
  ************************************************************************/
 function data_user_complete($course, $user, $mod, $data) {
-
     if ($records = get_records_select('data_records', 'dataid = '.$data->id.' AND userid = '.$user->id,
                                                       'timemodified DESC')) {
-
         data_print_template('singletemplate', $records, $data);
-
     }
 }
 
@@ -752,9 +732,7 @@ function data_user_complete($course, $user, $mod, $data) {
  */
 function data_get_user_grades($data, $userid=0) {
     global $CFG;
-
     $user = $userid ? "AND u.id = $userid" : "";
-
     $sql = "SELECT u.id, u.id AS userid, avg(drt.rating) AS rawgrade
               FROM {$CFG->prefix}user u, {$CFG->prefix}data_records dr,
                    {$CFG->prefix}data_ratings drt
@@ -762,7 +740,6 @@ function data_get_user_grades($data, $userid=0) {
                    AND drt.userid != u.id AND dr.dataid = $data->id
                    $user
           GROUP BY u.id";
-
     return get_records_sql($sql);
 }
 
@@ -781,17 +758,14 @@ function data_update_grades($data=null, $userid=0, $nullifnone=true) {
     if ($data != null) {
         if ($grades = data_get_user_grades($data, $userid)) {
             data_grade_item_update($data, $grades);
-
         } else if ($userid and $nullifnone) {
             $grade = new object();
             $grade->userid   = $userid;
             $grade->rawgrade = NULL;
             data_grade_item_update($data, $grade);
-
         } else {
             data_grade_item_update($data);
         }
-
     } else {
         $sql = "SELECT d.*, cm.idnumber as cmidnumber
                   FROM {$CFG->prefix}data d, {$CFG->prefix}course_modules cm, {$CFG->prefix}modules m
@@ -821,22 +795,17 @@ function data_grade_item_update($data, $grades=NULL) {
     if (!function_exists('grade_update')) { //workaround for buggy PHP versions
         require_once($CFG->libdir.'/gradelib.php');
     }
-
     $params = array('itemname'=>$data->name, 'idnumber'=>$data->cmidnumber);
-
     if (!$data->assessed or $data->scale == 0) {
         $params['gradetype'] = GRADE_TYPE_NONE;
-
     } else if ($data->scale > 0) {
         $params['gradetype'] = GRADE_TYPE_VALUE;
         $params['grademax']  = $data->scale;
         $params['grademin']  = 0;
-
     } else if ($data->scale < 0) {
         $params['gradetype'] = GRADE_TYPE_SCALE;
         $params['scaleid']   = -$data->scale;
     }
-
     if ($grades  === 'reset') {
         $params['reset'] = true;
         $grades = NULL;
@@ -854,7 +823,6 @@ function data_grade_item_update($data, $grades=NULL) {
 function data_grade_item_delete($data) {
     global $CFG;
     require_once($CFG->libdir.'/gradelib.php');
-
     return grade_update('mod/data', $data->course, 'mod', 'data', $data->id, 0, NULL, array('deleted'=>1));
 }
 
@@ -862,16 +830,14 @@ function data_grade_item_delete($data) {
  * returns a list of participants of this database                      *
  ************************************************************************/
 function data_get_participants($dataid) {
-//Returns the users with data in one data
-//(users with records in data_records, data_comments and data_ratings)
+// Returns the users with data in one data
+// (users with records in data_records, data_comments and data_ratings)
     global $CFG;
-
     $records = get_records_sql("SELECT DISTINCT u.id, u.id
                                 FROM {$CFG->prefix}user u,
                                      {$CFG->prefix}data_records r
                                 WHERE r.dataid = '$dataid'
                                   AND u.id = r.userid");
-
     $comments = get_records_sql("SELECT DISTINCT u.id, u.id
                                  FROM {$CFG->prefix}user u,
                                       {$CFG->prefix}data_records r,
@@ -879,7 +845,6 @@ function data_get_participants($dataid) {
                                  WHERE r.dataid = '$dataid'
                                    AND u.id = r.userid
                                    AND r.id = c.recordid");
-
     $ratings = get_records_sql("SELECT DISTINCT u.id, u.id
                                 FROM {$CFG->prefix}user u,
                                      {$CFG->prefix}data_records r,
@@ -888,27 +853,25 @@ function data_get_participants($dataid) {
                                   AND u.id = r.userid
                                   AND r.id = a.recordid");
     $participants = array();
-
-    if ($records){
+    if ($records) {
         foreach ($records as $record) {
             $participants[$record->id] = $record;
         }
     }
-    if ($comments){
+    if ($comments) {
         foreach ($comments as $comment) {
             $participants[$comment->id] = $comment;
         }
     }
-    if ($ratings){
+    if ($ratings) {
         foreach ($ratings as $rating) {
             $participants[$rating->id] = $rating;
         }
     }
-
     return $participants;
 }
 
-///junk functions
+// junk functions
 /************************************************************************
  * takes a list of records, the current data, a search string,          *
  * and mode to display prints the translated template                   *
@@ -920,20 +883,16 @@ function data_get_participants($dataid) {
  ************************************************************************/
 function data_print_template($template, $records, $data, $search='',$page=0, $return=false) {
     global $CFG;
-
     $cm = get_coursemodule_from_instance('data', $data->id);
     $context = get_context_instance(CONTEXT_MODULE, $cm->id);
-
     static $fields = NULL;
     static $isteacher;
     static $dataid = NULL;
-
     if (empty($dataid)) {
         $dataid = $data->id;
     } else if ($dataid != $data->id) {
         $fields = NULL;
     }
-
     if (empty($fields)) {
         $fieldrecords = get_records('data_fields','dataid', $data->id);
         foreach ($fieldrecords as $fieldrecord) {
@@ -941,24 +900,19 @@ function data_print_template($template, $records, $data, $search='',$page=0, $re
         }
         $isteacher = has_capability('mod/data:managetemplates', $context);
     }
-
     if (empty($records)) {
         return;
     }
-
-    foreach ($records as $record) {   /// Might be just one for the single template
-
-    /// Replacing tags
+    foreach ($records as $record) {   // Might be just one for the single template
+    // Replacing tags
         $patterns = array();
         $replacement = array();
-
-    /// Then we generate strings to replace for normal tags
+    // Then we generate strings to replace for normal tags
         foreach ($fields as $field) {
             $patterns[]='[['.$field->field->name.']]';
             $replacement[] = highlight($search, $field->display_browse_field($record->id, $template));
         }
-
-    /// Replacing special tags (##Edit##, ##Delete##, ##More##)
+    // Replacing special tags (##Edit##, ##Delete##, ##More##)
         $patterns[]='##edit##';
         $patterns[]='##delete##';
         if (has_capability('mod/data:manageentries', $context) or data_isowner($record->id)) {
@@ -987,7 +941,7 @@ function data_print_template($template, $records, $data, $search='',$page=0, $re
         $replacement [] = userdate($record->timemodified);
 
         $patterns[]='##approve##';
-        if (has_capability('mod/data:approve', $context) && ($data->approval) && (!$record->approved)){
+        if (has_capability('mod/data:approve', $context) && ($data->approval) && (!$record->approved)) {
             $replacement[] = '<span class="approve"><a href="'.$CFG->wwwroot.'/mod/data/view.php?d='.$data->id.'&amp;approve='.$record->id.'&amp;sesskey='.sesskey().'"><img src="'.$CFG->pixpath.'/i/approve.gif" class="icon" alt="'.get_string('approve').'" /></a></span>';
         } else {
             $replacement[] = '';
@@ -1001,15 +955,14 @@ function data_print_template($template, $records, $data, $search='',$page=0, $re
             $replacement[] = '';
         }
 
-        ///actual replacement of the tags
+        // actual replacement of the tags
         $newtext = str_ireplace($patterns, $replacement, $data->{$template});
 
-        /// no more html formatting and filtering - see MDL-6635
+        // no more html formatting and filtering - see MDL-6635
         if ($return) {
             return $newtext;
         } else {
             echo $newtext;
-
             // hack alert - return is always false in singletemplate anyway ;-)
             /**********************************
              *    Printing Ratings Form       *
@@ -1017,12 +970,10 @@ function data_print_template($template, $records, $data, $search='',$page=0, $re
             if ($template == 'singletemplate') {    //prints ratings options
                 data_print_ratings($data, $record);
             }
-
             /**********************************
              *    Printing Ratings Form       *
              *********************************/
             if (($template == 'singletemplate') && ($data->comments)) {    //prints ratings options
-
                 data_print_comments($data, $record, $page);
             }
         }
@@ -1043,9 +994,8 @@ function data_print_template($template, $records, $data, $search='',$page=0, $re
  *       @param string $search                                          *
  * output null                                                          *
  ************************************************************************/
-function data_print_preference_form($data, $perpage, $search, $sort='', $order='ASC', $search_array = '', $advanced = 0, $mode= ''){
+function data_print_preference_form($data, $perpage, $search, $sort='', $order='ASC', $search_array = '', $advanced = 0, $mode= '') {
     global $CFG;
-    
     $cm = get_coursemodule_from_instance('data', $data->id);
     $context = get_context_instance(CONTEXT_MODULE, $cm->id);
     echo '<br /><div class="datapreferences">';
@@ -1069,7 +1019,7 @@ function data_print_preference_form($data, $perpage, $search, $sort='', $order='
     }
     echo ';" >&nbsp;&nbsp;&nbsp;<label for="pref_search">'.get_string('search').'</label> <input type="text" size="16" name="search" id= "pref_search" value="'.s($search).'" /></div>';
     echo '&nbsp;&nbsp;&nbsp;<label for="pref_sortby">'.get_string('sortby').'</label> ';
-    //foreach field, print the option
+    // foreach field, print the option
     echo '<select name="sort" id="pref_sortby">';
     if ($fields = get_records('data_fields','dataid',$data->id, 'name')) {
         echo '<optgroup label="'.get_string('fields', 'data').'">';
@@ -1121,7 +1071,6 @@ function data_print_preference_form($data, $perpage, $search, $sort='', $order='
         $checked = '';
     }
     print '
-            
         <script type="text/javascript">
         //<![CDATA[
         <!-- Start
@@ -1154,10 +1103,8 @@ function data_print_preference_form($data, $perpage, $search, $sort='', $order='
     echo '&nbsp;<input type="hidden" name="advanced" value="0" />';
     echo '&nbsp;<input type="checkbox" id="advancedcheckbox" name="advanced" value="1" '.$checked.' onchange="showHideAdvSearch(this.checked);" /><label for="advancedcheckbox">'.get_string('advancedsearch', 'data').'</label>';
     echo '&nbsp;<input type="submit" value="'.get_string('savesettings','data').'" />';
-    
     echo '<br />';
     echo '<div class="dataadvancedsearch" id="data_adv_form" style="display: ';
-    
     if ($advanced) {
         echo 'inline';
     }
@@ -1166,7 +1113,6 @@ function data_print_preference_form($data, $perpage, $search, $sort='', $order='
     }
     echo ';margin-left:auto;margin-right:auto;" >';
     echo '<table class="boxaligncenter">';
-    
     // print ASC or DESC
     echo '<tr><td colspan="2">&nbsp;</td></tr>';
     $i = 0;
@@ -1180,7 +1126,6 @@ function data_print_preference_form($data, $perpage, $search, $sort='', $order='
     static $fields = NULL;
     static $isteacher;
     static $dataid = NULL;
-
     if (empty($dataid)) {
         $dataid = $data->id;
     } else if ($dataid != $data->id) {
@@ -1192,17 +1137,18 @@ function data_print_preference_form($data, $perpage, $search, $sort='', $order='
         foreach ($fieldrecords as $fieldrecord) {
             $fields[]= data_get_field($fieldrecord, $data);
         }
-
         $isteacher = has_capability('mod/data:managetemplates', $context);
     }
 
-    /// Replacing tags
+    // Replacing tags
     $patterns = array();
     $replacement = array();
 
-    /// Then we generate strings to replace for normal tags
+    // Then we generate strings to replace for normal tags
     foreach ($fields as $field) {
-        $patterns[]='/\[\['.$field->field->name.'\]\]/i';
+        $fieldname = $field->field->name;
+        $fieldname = preg_quote($fieldname, '/');
+        $patterns[] = "/\[\[$fieldname\]\]/i";
         $searchfield = data_get_field_from_id($field->field->id, $data);
         if (!empty($search_array[$field->field->id]->data)) {
             $replacement[] = $searchfield->display_search_field($search_array[$field->field->id]->data);
@@ -1217,24 +1163,20 @@ function data_print_preference_form($data, $perpage, $search, $sort='', $order='
     $patterns[]    = '/##lastname##/';
     $replacement[] = '<input type="text" size="16" name="u_ln" value="'.$ln.'" />';
 
-    ///actual replacement of the tags
+    // actual replacement of the tags
     $newtext = preg_replace($patterns, $replacement, $data->asearchtemplate);
-
     $options = new object();
     $options->para=false;
     $options->noclean=true;
     echo '<tr><td>';
     echo format_text($newtext, FORMAT_HTML, $options);
     echo '</td></tr>';
-
     echo '<tr><td colspan="4" style="text-align: center;"><br/><input type="submit" value="'.get_string('savesettings','data').'" /><input type="submit" name="resetadv" value="'.get_string('resetsettings','data').'" /></td></tr>';
     echo '</table>';
     echo '</div>';
     echo '</div>';
     echo '</form>';
-    echo '</div>'; 
-
-    
+    echo '</div>';
 }
 
 function data_print_ratings($data, $record) {
@@ -1242,25 +1184,20 @@ function data_print_ratings($data, $record) {
 
     $cm = get_coursemodule_from_instance('data', $data->id);
     $context = get_context_instance(CONTEXT_MODULE, $cm->id);
-
     if ($data->assessed and !empty($USER->id) and (has_capability('mod/data:rate', $context) or has_capability('mod/data:viewrating', $context) or data_isowner($record->id))) {
         if ($ratingsscale = make_grades_menu($data->scale)) {
             $ratingsmenuused = false;
-
             echo '<div class="ratings" style="text-align:center">';
             echo '<form id="form" method="post" action="rate.php">';
             echo '<input type="hidden" name="dataid" value="'.$data->id.'" />';
-
             if (has_capability('mod/data:rate', $context) and !data_isowner($record->id)) {
                 data_print_ratings_mean($record->id, $ratingsscale, has_capability('mod/data:viewrating', $context));
                 echo '&nbsp;';
                 data_print_rating_menu($record->id, $USER->id, $ratingsscale);
                 $ratingsmenuused = true;
-
             } else {
                 data_print_ratings_mean($record->id, $ratingsscale, true);
             }
-
             if ($data->scale < 0) {
                 if ($scale = get_record('scale', 'id', abs($data->scale))) {
                     print_scale_menu_helpbutton($data->course, $scale );
@@ -1278,19 +1215,15 @@ function data_print_ratings($data, $record) {
 }
 
 function data_print_ratings_mean($recordid, $scale, $link=true) {
-/// Print the multiple ratings on a post given to the current user by others.
-/// Scale is an array of ratings
+// Print the multiple ratings on a post given to the current user by others.
+// Scale is an array of ratings
 
     static $strrate;
-
     $mean = data_get_ratings_mean($recordid, $scale);
-
     if ($mean !== "") {
-
         if (empty($strratings)) {
             $strratings = get_string("ratings", "data");
         }
-
         echo "$strratings: ";
         if ($link) {
             link_to_popup_window ("/mod/data/report.php?id=$recordid", "ratings", $mean, 400, 600);
@@ -1302,10 +1235,9 @@ function data_print_ratings_mean($recordid, $scale, $link=true) {
 
 
 function data_get_ratings_mean($recordid, $scale, $ratings=NULL) {
-/// Return the mean rating of a post given to the current user by others.
-/// Scale is an array of possible ratings in the scale
-/// Ratings is an optional simple array of actual ratings (just integers)
-
+// Return the mean rating of a post given to the current user by others.
+// Scale is an array of possible ratings in the scale
+// Ratings is an optional simple array of actual ratings (just integers)
     if (!$ratings) {
         $ratings = array();
         if ($rates = get_records("data_ratings", "recordid", $recordid)) {
@@ -1314,22 +1246,17 @@ function data_get_ratings_mean($recordid, $scale, $ratings=NULL) {
             }
         }
     }
-
     $count = count($ratings);
-
     if ($count == 0) {
         return "";
-
     } else if ($count == 1) {
         return $scale[$ratings[0]];
-
     } else {
         $total = 0;
         foreach ($ratings as $rating) {
             $total += $rating;
         }
         $mean = round( ((float)$total/(float)$count) + 0.001);  // Little fudge factor so that 0.5 goes UP
-
         if (isset($scale[$mean])) {
             return $scale[$mean]." ($count)";
         } else {
@@ -1340,26 +1267,22 @@ function data_get_ratings_mean($recordid, $scale, $ratings=NULL) {
 
 
 function data_print_rating_menu($recordid, $userid, $scale) {
-/// Print the menu of ratings as part of a larger form.
-/// If the post has already been - set that value.
-/// Scale is an array of ratings
-
+// Print the menu of ratings as part of a larger form.
+// If the post has already been - set that value.
+// Scale is an array of ratings
     static $strrate;
-
     if (!$rating = get_record("data_ratings", "userid", $userid, "recordid", $recordid)) {
         $rating->rating = -999;
     }
-
     if (empty($strrate)) {
         $strrate = get_string("rate", "data");
     }
-
     choose_from_menu($scale, $recordid, $rating->rating, "$strrate...", '', -999);
 }
 
 
 function data_get_ratings($recordid, $sort="u.firstname ASC") {
-/// Returns a list of ratings for a particular post - sorted.
+// Returns a list of ratings for a particular post - sorted.
     global $CFG;
     return get_records_sql("SELECT u.*, r.rating
                               FROM {$CFG->prefix}data_ratings r,
@@ -1367,30 +1290,23 @@ function data_get_ratings($recordid, $sort="u.firstname ASC") {
                              WHERE r.recordid = $recordid
                                AND r.userid = u.id
                              ORDER BY $sort");
-
 }
 
 
-//prints all comments + a text box for adding additional comment
+// prints all comments + a text box for adding additional comment
 function data_print_comments($data, $record, $page=0, $mform=false) {
-
     global $CFG;
-
     echo '<a name="comments"></a>';
-
     if ($comments = get_records('data_comments','recordid',$record->id)) {
         foreach ($comments as $comment) {
             data_print_comment($data, $comment, $page);
         }
         echo '<br />';
     }
-
     if (!isloggedin() or isguest()) {
         return;
     }
-
     $editor = optional_param('addcomment', 0, PARAM_BOOL);
-
     if (!$mform and !$editor) {
         echo '<div class="newcomment" style="text-align:center">';
         echo '<a href="view.php?d='.$data->id.'&amp;page='.$page.'&amp;mode=single&amp;addcomment=1">'.get_string('addcomment', 'data').'</a>';
@@ -1407,25 +1323,18 @@ function data_print_comments($data, $record, $page=0, $mform=false) {
     }
 }
 
-//prints a single comment entry
+// prints a single comment entry
 function data_print_comment($data, $comment, $page=0) {
-
     global $USER, $CFG;
-
     $cm = get_coursemodule_from_instance('data', $data->id);
     $context = get_context_instance(CONTEXT_MODULE, $cm->id);
-
     $stredit = get_string('edit');
     $strdelete = get_string('delete');
-
     $user = get_record('user','id',$comment->userid);
-
     echo '<table cellspacing="0" align="center" width="50%" class="datacomment forumpost">';
-
     echo '<tr class="header"><td class="picture left">';
     print_user_picture($user, $data->course, $user->picture);
     echo '</td>';
-
     echo '<td class="topic starter" align="left"><div class="author">';
     $fullname = fullname($user, has_capability('moodle/site:viewfullnames', $context));
     $by = new object();
@@ -1434,7 +1343,6 @@ function data_print_comment($data, $comment, $page=0) {
     $by->date = userdate($comment->modified);
     print_string('bynameondate', 'data', $by);
     echo '</div></td></tr>';
-
     echo '<tr><td class="left side">';
     if ($groups = groups_get_all_groups($data->course, $comment->userid, $cm->groupingid)) {
         print_group_picture($groups, $data->course, false, false, true);
@@ -1442,15 +1350,12 @@ function data_print_comment($data, $comment, $page=0) {
         echo '&nbsp;';
     }
 
-/// Actual content
-
+// Actual content
     echo '</td><td class="content" align="left">'."\n";
-
     // Print whole message
     echo format_text($comment->content, $comment->format);
 
-/// Commands
-
+// Commands
     echo '<div class="commands">';
     if (data_isowner($comment->recordid) or has_capability('mod/data:managecomments', $context)) {
             echo '<a href="'.$CFG->wwwroot.'/mod/data/comment.php?rid='.$comment->recordid.'&amp;mode=edit&amp;commentid='.$comment->id.'&amp;page='.$page.'">'.$stredit.'</a>';
@@ -1458,7 +1363,6 @@ function data_print_comment($data, $comment, $page=0) {
     }
 
     echo '</div>';
-
     echo '</td></tr></table>'."\n\n";
 }
 
@@ -1474,7 +1378,6 @@ function data_get_post_actions() {
 
 function data_fieldname_exists($name, $dataid, $fieldid=0) {
     global $CFG;
-
     $LIKE = sql_ilike();
     if ($fieldid) {
         return record_exists_sql("SELECT * from {$CFG->prefix}data_fields df
@@ -1494,7 +1397,6 @@ function data_convert_arrays_to_strings(&$fieldinput) {
                 $str .= $inner . ',';
             }
             $str = substr($str, 0, -1);
-
             $fieldinput->$key = $str;
         }
     }
@@ -1513,9 +1415,7 @@ function data_convert_arrays_to_strings(&$fieldinput) {
  * @return boolean      - data module was converted or not
  */
 function data_convert_to_roles($data, $teacherroles=array(), $studentroles=array(), $cmid=NULL) {
-
     global $CFG;
-
     if (!isset($data->participants) && !isset($data->assesspublic)
             && !isset($data->groupmode)) {
         // We assume that this database has already been converted to use the
@@ -1523,7 +1423,6 @@ function data_convert_to_roles($data, $teacherroles=array(), $studentroles=array
         // upgraded to use Roles.
         return false;
     }
-
     if (empty($cmid)) {
         // We were not given the course_module id. Try to find it.
         if (!$cm = get_coursemodule_from_instance('data', $data->id)) {
@@ -1534,7 +1433,6 @@ function data_convert_to_roles($data, $teacherroles=array(), $studentroles=array
         }
     }
     $context = get_context_instance(CONTEXT_MODULE, $cmid);
-
 
     // $data->participants:
     // 1 - Only teachers can add entries
@@ -1643,7 +1541,7 @@ function data_convert_to_roles($data, $teacherroles=array(), $studentroles=array
  */
 function data_preset_name($shortname, $path) {
 
-    /// We are looking inside the preset itself as a first choice, but also in normal data directory
+    // We are looking inside the preset itself as a first choice, but also in normal data directory
     $string = get_string('modulename', 'datapreset_'.$shortname);
 
     if (substr($string, 0, 1) == '[') {
@@ -1658,13 +1556,10 @@ function data_preset_name($shortname, $path) {
  */
 function data_get_available_presets($context) {
     global $CFG, $USER;
-
     $presets = array();
-
     if ($dirs = get_list_of_plugins('mod/data/preset')) {
         foreach ($dirs as $dir) {
             $fulldir = $CFG->dirroot.'/mod/data/preset/'.$dir;
-
             if (is_directory_a_preset($fulldir)) {
                 $preset = new object;
                 $preset->path = $fulldir;
@@ -1686,13 +1581,10 @@ function data_get_available_presets($context) {
     if ($userids = get_list_of_plugins('data/preset', '', $CFG->dataroot)) {
         foreach ($userids as $userid) {
             $fulldir = $CFG->dataroot.'/data/preset/'.$userid;
-
             if ($userid == 0 || $USER->id == $userid || has_capability('mod/data:viewalluserpresets', $context)) {
-
                 if ($dirs = get_list_of_plugins('data/preset/'.$userid, '', $CFG->dataroot)) {
                     foreach ($dirs as $dir) {
                         $fulldir = $CFG->dataroot.'/data/preset/'.$userid.'/'.$dir;
-
                         if (is_directory_a_preset($fulldir)) {
                             $preset = new object;
                             $preset->path = $fulldir;
@@ -1713,34 +1605,26 @@ function data_get_available_presets($context) {
             }
         }
     }
-
     return $presets;
 }
 
 
 function data_print_header($course, $cm, $data, $currenttab='') {
-
     global $CFG, $displaynoticegood, $displaynoticebad;
-
     $navigation = build_navigation('', $cm);
     print_header_simple($data->name, '', $navigation,
             '', '', true, update_module_button($cm->id, $course->id, get_string('modulename', 'data')),
             navmenu($course, $cm));
-
     print_heading(format_string($data->name));
 
-/// Groups needed for Add entry tab
+// Groups needed for Add entry tab
     $currentgroup = groups_get_activity_group($cm);
     $groupmode = groups_get_activity_groupmode($cm);
-
-    /// Print the tabs
-
+    // Print the tabs
     if ($currenttab) {
         include('tabs.php');
     }
-
-    /// Print any notices
-
+    // Print any notices
     if (!empty($displaynoticegood)) {
         notify($displaynoticegood, 'notifysuccess');    // good (usually green)
     } else if (!empty($displaynoticebad)) {
@@ -1750,16 +1634,13 @@ function data_print_header($course, $cm, $data, $currenttab='') {
 
 function data_user_can_add_entry($data, $currentgroup, $groupmode) {
     global $USER;
-
     if (!$cm = get_coursemodule_from_instance('data', $data->id)) {
         error('Course Module ID was incorrect');
     }
     $context = get_context_instance(CONTEXT_MODULE, $cm->id);
-
     if (!has_capability('mod/data:writeentry', $context) and !has_capability('mod/data:manageentries',$context)) {
         return false;
     }
-
     if (!$groupmode or has_capability('moodle/site:accessallgroups', $context)) {
         return true;
     }
@@ -1776,7 +1657,6 @@ function data_user_can_add_entry($data, $currentgroup, $groupmode) {
     }
 }
 
-// pulled directly out of preset.php Penny 20070426
 
 function is_directory_a_preset($directory) {
     $directory = rtrim($directory, '/\\') . '/';
@@ -1790,7 +1670,6 @@ function is_directory_a_preset($directory) {
               file_exists($directory.'csstemplate.css') &&
               file_exists($directory.'jstemplate.js') &&
               file_exists($directory.'preset.xml');
-
     return $status;
 }
 
@@ -1809,119 +1688,8 @@ function clean_preset($folder) {
 
     // optional
     @unlink($folder.'/asearchtemplate.html');
-
     return $status;
 }
-
-
-function data_presets_export($course, $cm, $data) {
-    global $CFG;
-
-    /* Info Collected. Now need to make files in moodledata/temp */
-    $tempfolder = $CFG->dataroot.'/temp';
-    $singletemplate     = fopen($tempfolder.'/singletemplate.html', 'w');
-    $listtemplate       = fopen($tempfolder.'/listtemplate.html', 'w');
-    $listtemplateheader = fopen($tempfolder.'/listtemplateheader.html', 'w');
-    $listtemplatefooter = fopen($tempfolder.'/listtemplatefooter.html', 'w');
-    $addtemplate        = fopen($tempfolder.'/addtemplate.html', 'w');
-    $rsstemplate        = fopen($tempfolder.'/rsstemplate.html', 'w');
-    $rsstitletemplate   = fopen($tempfolder.'/rsstitletemplate.html', 'w');
-    $csstemplate        = fopen($tempfolder.'/csstemplate.css', 'w');
-    $jstemplate         = fopen($tempfolder.'/jstemplate.js', 'w');
-    $asearchtemplate    = fopen($tempfolder.'/asearchtemplate.html', 'w');
-
-    fwrite($singletemplate, $data->singletemplate);
-    fwrite($listtemplate, $data->listtemplate);
-    fwrite($listtemplateheader, $data->listtemplateheader);
-    fwrite($listtemplatefooter, $data->listtemplatefooter);
-    fwrite($addtemplate, $data->addtemplate);
-    fwrite($rsstemplate, $data->rsstemplate);
-    fwrite($rsstitletemplate, $data->rsstitletemplate);
-    fwrite($csstemplate, $data->csstemplate);
-    fwrite($jstemplate, $data->jstemplate);
-    fwrite($asearchtemplate, $data->asearchtemplate);
-
-    fclose($singletemplate);
-    fclose($listtemplate);
-    fclose($listtemplateheader);
-    fclose($listtemplatefooter);
-    fclose($addtemplate);
-    fclose($rsstemplate);
-    fclose($rsstitletemplate);
-    fclose($csstemplate);
-    fclose($jstemplate);
-    fclose($asearchtemplate);
-
-    /* All the display data is now done. Now assemble preset.xml */
-    $fields = get_records('data_fields', 'dataid', $data->id);
-    $presetfile = fopen($tempfolder.'/preset.xml', 'w');
-    $presetxml = "<preset>\n\n";
-
-    // raw settings are not preprocessed during saving of presets
-    $raw_settings = array('intro', 'comments', 'requiredentries', 'requiredentriestoview',
-                          'maxentries', 'rssarticles', 'approval', 'defaultsortdir');
-
-    $presetxml .= "<settings>\n";
-    // first settings that do not require any conversion
-    foreach ($raw_settings as $setting) {
-        $presetxml .= "<$setting>".htmlspecialchars($data->$setting)."</$setting>\n";
-    }
-
-    // now specific settings
-    if ($data->defaultsort > 0 and $sortfield = data_get_field_from_id($data->defaultsort, $data)) {
-        $presetxml .= "<defaultsort>".htmlspecialchars($sortfield->field->name)."</defaultsort>\n";
-    } else {
-        $presetxml .= "<defaultsort>0</defaultsort>\n";
-    }
-    // note: grading settings are not exported intentionally
-    $presetxml .= "</settings>\n\n";
-
-    /* Now for the fields. Grabs all settings that are non-empty */
-    if (!empty($fields)) {
-        foreach ($fields as $field) {
-            $presetxml .= "<field>\n";
-            foreach ($field as $key => $value) {
-                if ($value != '' && $key != 'id' && $key != 'dataid') {
-                    $presetxml .= "<$key>".htmlspecialchars($value)."</$key>\n";
-                }
-            }
-            $presetxml .= "</field>\n\n";
-        }
-    }
-
-    $presetxml .= "</preset>";
-    fwrite($presetfile, $presetxml);
-    fclose($presetfile);
-
-    /* Check all is well */
-    if (!is_directory_a_preset($tempfolder)) {
-        error("Not all files generated!");
-    }
-
-    $filelist = array(
-            'singletemplate.html',
-            'listtemplate.html',
-            'listtemplateheader.html',
-            'listtemplatefooter.html',
-            'addtemplate.html',
-            'rsstemplate.html',
-            'rsstitletemplate.html',
-            'csstemplate.css',
-            'jstemplate.js',
-            'preset.xml',
-            'asearchtemplate.html');
-
-    foreach ($filelist as $key => $file) {
-        $filelist[$key] = $tempfolder.'/'.$filelist[$key];
-    }
-
-    @unlink($tempfolder.'/export.zip');
-    $status = zip_files($filelist, $tempfolder.'/export.zip');
-
-    /* made the zip... now return the filename for storage.*/
-    return $tempfolder.'/export.zip';
-}
-
 
 
 class PresetImporter {
@@ -1997,7 +1765,7 @@ class PresetImporter {
         if (file_exists($this->folder."/asearchtemplate.html")) {
             $settings->asearchtemplate = file_get_contents($this->folder."/asearchtemplate.html");
         } else {
-            $settings->asearchtemplate =  NULL;
+            $settings->asearchtemplate = NULL;
         }
 
         $settings->instance = $this->data->id;
@@ -2015,33 +1783,26 @@ class PresetImporter {
         if (!confirm_sesskey()) {
             error("Sesskey Invalid");
         }
-
         $strblank = get_string('blank', 'data');
         $strcontinue = get_string('continue');
         $strwarning = get_string('mappingwarning', 'data');
         $strfieldmappings = get_string('fieldmappings', 'data');
         $strnew = get_string('new');
-
         $sesskey = sesskey();
-
         list($settings, $newfields,  $currentfields) = $this->get_settings();
-
         echo '<div class="presetmapping"><form action="preset.php" method="post">';
         echo '<div>';
         echo '<input type="hidden" name="action" value="finishimport" />';
         echo '<input type="hidden" name="sesskey" value="'.sesskey().'" />';
         echo '<input type="hidden" name="d" value="'.$this->data->id.'" />';
         echo '<input type="hidden" name="fullname" value="'.$this->userid.'/'.$this->shortname.'" />';
-
         if (!empty($currentfields) && !empty($newfields)) {
             echo "<h3>$strfieldmappings ";
             helpbutton('fieldmappings', $strfieldmappings, 'data');
             echo '</h3><table>';
-
             foreach ($newfields as $nid => $newfield) {
                 echo "<tr><td><label for=\"id_$newfield->name\">$newfield->name</label></td>";
                 echo '<td><select name="field_'.$nid.'" id="id_'.$newfield->name.'">';
-
                 $selected = false;
                 foreach ($currentfields as $cid => $currentfield) {
                     if ($currentfield->type == $newfield->type) {
@@ -2054,7 +1815,6 @@ class PresetImporter {
                         }
                     }
                 }
-
                 if ($selected)
                     echo '<option value="-1">-</option>';
                 else
@@ -2063,40 +1823,30 @@ class PresetImporter {
             }
             echo '</table>';
             echo "<p>$strwarning</p>";
-
         } else if (empty($newfields)) {
             error("New preset has no defined fields!");
         }
-
         echo '<div class="overwritesettings"><label for="overwritesettings">'.get_string('overwritesettings', 'data').'</label>';
         echo '<input id="overwritesettings" name="overwritesettings" type="checkbox" /></label></div>';
-
         echo '<input class="button" type="submit" value="'.$strcontinue.'" /></div></form></div>';
-
     }
 
     function import() {
         global $CFG;
-
         list($settings, $newfields, $currentfields) = $this->get_settings();
         $preservedfields = array();
-
         $overwritesettings = optional_param('overwritesettings', 0, PARAM_BOOL);
-
         /* Maps fields and makes new ones */
         if (!empty($newfields)) {
             /* We require an injective mapping, and need to know what to protect */
             foreach ($newfields as $nid => $newfield) {
                 $cid = optional_param("field_$nid", -1, PARAM_INT);
                 if ($cid == -1) continue;
-
                 if (array_key_exists($cid, $preservedfields)) error("Not an injective map");
                 else $preservedfields[$cid] = true;
             }
-
             foreach ($newfields as $nid => $newfield) {
                 $cid = optional_param("field_$nid", -1, PARAM_INT);
-
                 /* A mapping. Just need to change field params. Data kept. */
                 if ($cid != -1 and isset($currentfields[$cid])) {
                     $fieldobject = data_get_field_from_id($currentfields[$cid]->id, $this->data);
@@ -2112,7 +1862,6 @@ class PresetImporter {
                 /* Make a new field */
                 else {
                     include_once("field/$newfield->type/field.class.php");
-
                     if (!isset($newfield->description)) {
                         $newfield->description = '';
                     }
@@ -2130,7 +1879,6 @@ class PresetImporter {
                 if (!array_key_exists($cid, $preservedfields)) {
                     /* Data not used anymore so wipe! */
                     print "Deleting field $currentfield->name<br />";
-
                     $id = $currentfield->id;
                     //Why delete existing data records and related comments/ratings??
 /*
@@ -2147,10 +1895,10 @@ class PresetImporter {
             }
         }
 
-    /// handle special settings here
+    // handle special settings here
         if (!empty($settings->defaultsort)) {
             if (is_numeric($settings->defaultsort)) {
-                //old broken value
+                // old broken value
                 $settings->defaultsort = 0;
             } else {
                 $settings->defaultsort = (int)get_field('data_fields', 'id', 'dataid', $this->data->id, 'name', addslashes($settings->defaultsort));
@@ -2178,23 +1926,18 @@ class PresetImporter {
         }
 
         data_update_instance(addslashes_object($this->data));
-
         if (strstr($this->folder, '/temp/')) {
         // Removes the temporary files
             clean_preset($this->folder); 
         }
-
         return true;
     }
 }
 
 function data_preset_path($course, $userid, $shortname) {
     global $USER, $CFG;
-
     $context = get_context_instance(CONTEXT_COURSE, $course->id);
-
     $userid = (int)$userid;
-
     if ($userid > 0 && ($userid == $USER->id || has_capability('mod/data:viewalluserpresets', $context))) {
         return $CFG->dataroot.'/data/preset/'.$userid.'/'.$shortname;
     } else if ($userid == 0) {
@@ -2202,7 +1945,6 @@ function data_preset_path($course, $userid, $shortname) {
     } else if ($userid < 0) {
         return $CFG->dataroot.'/temp/data/'.-$userid.'/'.$shortname;
     }
-
     return 'Does it disturb you that this code will never run?';
 }
 
@@ -2239,11 +1981,9 @@ function data_reset_course_form_defaults($course) {
  */
 function data_reset_gradebook($courseid, $type='') {
     global $CFG;
-
     $sql = "SELECT d.*, cm.idnumber as cmidnumber, d.course as courseid
               FROM {$CFG->prefix}data d, {$CFG->prefix}course_modules cm, {$CFG->prefix}modules m
              WHERE m.name='data' AND m.id=cm.module AND cm.instance=d.id AND d.course=$courseid";
-
     if ($datas = get_records_sql($sql)) {
         foreach ($datas as $data) {
             data_grade_item_update($data, 'reset');
@@ -2260,32 +2000,26 @@ function data_reset_gradebook($courseid, $type='') {
 function data_reset_userdata($data) {
     global $CFG;
     require_once($CFG->libdir.'/filelib.php');
-
     $componentstr = get_string('modulenameplural', 'data');
     $status = array();
-
     $allrecordssql = "SELECT r.id
                         FROM {$CFG->prefix}data_records r
                              INNER JOIN {$CFG->prefix}data d ON r.dataid = d.id
                        WHERE d.course = {$data->courseid}";
-
     $alldatassql = "SELECT d.id
                       FROM {$CFG->prefix}data d
                      WHERE d.course={$data->courseid}";
-
     // delete entries if requested
     if (!empty($data->reset_data)) {
         delete_records_select('data_ratings', "recordid IN ($allrecordssql)");
         delete_records_select('data_comments', "recordid IN ($allrecordssql)");
         delete_records_select('data_content', "recordid IN ($allrecordssql)");
         delete_records_select('data_records', "dataid IN ($alldatassql)");
-
         if ($datas = get_records_sql($alldatassql)) {
             foreach ($datas as $dataid=>$unused) {
                 fulldelete("$CFG->dataroot/$data->courseid/moddata/data/$dataid");
             }
         }
-
         if (empty($data->reset_gradebook_grades)) {
             // remove all grades from gradebook
             data_reset_gradebook($data->courseid);
@@ -2300,7 +2034,6 @@ function data_reset_userdata($data) {
                               INNER JOIN {$CFG->prefix}data d ON r.dataid = d.id
                               LEFT OUTER JOIN {$CFG->prefix}user u ON r.userid = u.id
                         WHERE d.course = {$data->courseid} AND r.userid > 0";
-
         $course_context = get_context_instance(CONTEXT_COURSE, $data->courseid);
         $notenrolled = array();
         $fields = array();
@@ -2334,12 +2067,10 @@ function data_reset_userdata($data) {
     // remove all ratings
     if (!empty($data->reset_data_ratings)) {
         delete_records_select('data_ratings', "recordid IN ($allrecordssql)");
-
         if (empty($data->reset_gradebook_grades)) {
             // remove all grades from gradebook
             data_reset_gradebook($data->courseid);
         }
-
         $status[] = array('component'=>$componentstr, 'item'=>get_string('deleteallratings'), 'error'=>false);
     }
 
@@ -2349,12 +2080,11 @@ function data_reset_userdata($data) {
         $status[] = array('component'=>$componentstr, 'item'=>get_string('deleteallcomments'), 'error'=>false);
     }
 
-    /// updating dates - shift may be negative too
+    // updating dates - shift may be negative too
     if ($data->timeshift) {
         shift_course_mod_dates('data', array('timeavailablefrom', 'timeavailableto', 'timeviewfrom', 'timeviewto'), $data->timeshift, $data->courseid);
         $status[] = array('component'=>$componentstr, 'item'=>get_string('datechanged'), 'error'=>false);
     }
-
     return $status;
 }
 ?>

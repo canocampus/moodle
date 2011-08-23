@@ -1,5 +1,9 @@
 <?php // $Id$
       // This script fetches files from the dataroot directory
+      //
+      // You should use the get_file_url() function, available in lib/filelib.php, to link to file.php.
+      // This ensures proper formatting and offers useful options.
+      //
       // Syntax:      file.php/courseid/dir/dir/dir/filename.ext
       //              file.php/courseid/dir/dir/dir/filename.ext?forcedownload=1 (download instead of inline)
       //              file.php/courseid/dir (returns index.html from dir)
@@ -106,10 +110,17 @@
         and (strtolower($args[2]) == 'assignment')) {
 
         $lifetime = 0;  // do not cache assignments, students may reupload them
-        if (!has_capability('mod/assignment:grade', get_context_instance(CONTEXT_COURSE, $course->id))
-          and $args[4] != $USER->id) {
-           error('Access not allowed');
-        }
+        if ($args[4] == $USER->id) {
+            //can view own assignemnt submissions
+        } else {
+            $instance = (int)$args[3];
+            if (!$cm = get_coursemodule_from_instance('assignment', $instance, $course->id)) {
+                not_found($course->id);
+            }
+            if (!has_capability('mod/assignment:grade', get_context_instance(CONTEXT_MODULE, $cm->id))) {
+                error('Access not allowed');
+            }
+        } 
     }
 
     // security: force download of all attachments submitted by students

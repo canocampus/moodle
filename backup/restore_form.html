@@ -261,7 +261,7 @@ function selectItemInCheckboxByName(formId, checkName, checked ) {
         echo "<td align=\"right\">";
         echo '<label for="shortnamefield">'.get_string ('shortname').'</label>';
         echo "</td>";
-        echo "<td><input type=\"text\" id=\"shortnamefield\" name=\"shortname\" maxlength=\"100\"  size=\"20\" value=\"$form1->shortname\" alt=\"".get_string("shortname")."\"  />" ;
+        echo "<td><input type=\"text\" id=\"shortnamefield\" name=\"shortname\" maxlength=\"100\"  size=\"20\" value=\"".s($form1->shortname)."\" alt=\"".get_string("shortname")."\"  />" ;
         helpbutton("courseshortname", get_string("shortname")) ;
         if (isset($err["shortname"])) formerr($err["shortname"]);
         echo "</td>";
@@ -270,7 +270,7 @@ function selectItemInCheckboxByName(formId, checkName, checked ) {
         echo "<td align=\"right\">";
         echo '<label for="fullnamefield">'.get_string ('fullname').'</label>';
         echo "</td>";
-        echo "<td><input type=\"text\" id=\"fullnamefield\" name=\"fullname\" maxlength=\"254\" size=\"50\" value=\"$form1->fullname\" alt=\" ".get_string("fullname")."\"  />" ;
+        echo "<td><input type=\"text\" id=\"fullnamefield\" name=\"fullname\" maxlength=\"254\" size=\"50\" value=\"".s($form1->fullname)."\" alt=\" ".get_string("fullname")."\"  />" ;
         helpbutton("coursefullname", get_string("fullname")) ;
         if (isset($err["fullname"])) formerr($err["fullname"]);
         echo"</td></tr>";
@@ -368,7 +368,7 @@ function selectItemInCheckboxByName(formId, checkName, checked ) {
                                 echo '</td><td align="right">&nbsp;';
                                 $var = 'restore_user_info_'.$modname.'_instance_'.$instance->id;
                                 $$var = optional_param($var,1);
-                                if ($info->mods[$modname]->instances[$instance->id]->userinfo == 'true') {
+                                if (!empty($info->mods[$modname]->instances) && ($info->mods[$modname]->instances[$instance->id]->userinfo == 'true')) {
                                     print_checkbox($var,$$var,$$var,get_string('userdata'),'','this.form.elements[\'restore_user_info_'.$modname.'\'].checked=1;');
                                 } else {
                                     echo '<input type="hidden" name="'.$var.'" value="0" />';

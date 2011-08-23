@@ -551,7 +551,7 @@ class flexible_table {
             $alpha  = explode(',', get_string('alphabet'));
 
             // Bar of first initials
-
+         
             echo '<div class="initialbar firstinitial">'.get_string('firstname').' : ';
             if(!empty($this->sess->i_first)) {
                 echo '<a href="'.$this->baseurl.$this->request[TABLE_VAR_IFIRST].'=">'.$strall.'</a>';
@@ -559,7 +559,7 @@ class flexible_table {
                 echo '<strong>'.$strall.'</strong>';
             }
             foreach ($alpha as $letter) {
-                if ($letter == $this->sess->i_first) {
+                if (isset($this->sess->i_first) && $letter == $this->sess->i_first) {
                     echo ' <strong>'.$letter.'</strong>';
                 } else {
                     echo ' <a href="'.$this->baseurl.$this->request[TABLE_VAR_IFIRST].'='.$letter.'">'.$letter.'</a>';
@@ -576,7 +576,7 @@ class flexible_table {
                 echo '<strong>'.$strall.'</strong>';
             }
             foreach ($alpha as $letter) {
-                if ($letter == $this->sess->i_last) {
+                if (isset($this->sess->i_last) && $letter == $this->sess->i_last) {
                     echo ' <strong>'.$letter.'</strong>';
                 } else {
                     echo ' <a href="'.$this->baseurl.$this->request[TABLE_VAR_ILAST].'='.$letter.'">'.$letter.'</a>';
@@ -773,6 +773,27 @@ class flexible_table {
             return false;
         }
         $this->data[] = NULL;
+    }
+    
+    /**
+     * Add a row of data to the table. This function takes an array with 
+     * column names as keys. 
+     * It ignores any elements with keys that are not defined as columns. It
+     * puts in empty strings into the row when there is no element in the passed
+     * array corresponding to a column in the table. It puts the row elements in
+     * the proper order.
+     * @param $rowwithkeys array
+     * 
+     */
+    function add_data_keyed($rowwithkeys){
+        foreach (array_keys($this->columns) as $column){
+            if (isset($rowwithkeys[$column])){
+                $row [] = $rowwithkeys[$column];
+            } else {
+                $row[] ='';
+            }
+        }
+        $this->add_data($row);
     }
 
 }

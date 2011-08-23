@@ -102,6 +102,8 @@
         }
     }
 
+    $form = null;
+
     switch($action) {
         case 'delete':
             $title = get_string('deleteevent', 'calendar');
@@ -158,15 +160,14 @@
                         }
 
                         execute_sql('UPDATE '.$CFG->prefix.'event SET '.
-                            'name = '.$db->qstr($form->name).','.
-                            'description = '.$db->qstr($form->description).','.
+                            'name = \''.$form->name.'\','.
+                            'description = \''.$form->description.'\','.
                             'timestart = '.$timestartoffset.','.
                             'timeduration = '.$form->timeduration.','.
                             'timemodified = '.time().' WHERE repeatid = '.$event->repeatid);
 
                         /// Log the event update.
-                        $form->name = stripslashes($form->name);  //To avoid double-slashes
-                        add_to_log($form->courseid, 'calendar', 'edit all', 'event.php?action=edit&amp;id='.$form->id, $form->name);
+                        add_to_log($form->courseid, 'calendar', 'edit all', 'event.php?action=edit&amp;id='.$form->id, stripslashes($form->name));
                     }
 
                     else {
@@ -175,8 +176,7 @@
                         update_record('event', $form);
 
                         /// Log the event update.
-                        $form->name = stripslashes($form->name);  //To avoid double-slashes
-                        add_to_log($form->courseid, 'calendar', 'edit', 'event.php?action=edit&amp;id='.$form->id, $form->name);
+                        add_to_log($form->courseid, 'calendar', 'edit', 'event.php?action=edit&amp;id='.$form->id, stripslashes($form->name));
                     }
 
                     // OK, now redirect to day view
@@ -261,6 +261,7 @@
         break;
     }
 
+    $form = stripslashes_recursive($form);
 
     if (!empty($SESSION->cal_course_referer)) {
         // TODO: This is part of the Great $course Hack in Moodle. Replace it at some point.
@@ -299,6 +300,7 @@
                     }
                 }
 
+                echo '</td></tr></table>';
                 redirect(CALENDAR_URL.'view.php?view=day&amp;course='.$urlcourse.'&cal_d='.$_REQUEST['d'].'&cal_m='.$_REQUEST['m'].'&cal_y='.$_REQUEST['y']);
 
             }

@@ -69,10 +69,11 @@ $sesskey = sesskey();
 
 /********************************************************************/
 /* Output */
-data_print_header($course, $cm, $data, 'presets');
+if ($action !== 'export') {
+    data_print_header($course, $cm, $data, 'presets');
+}
 
 switch ($action) {
-
         /***************** Deleting *****************/
     case 'confirmdelete' :
         if (!confirm_sesskey()) { // GET request ok here
@@ -100,7 +101,7 @@ switch ($action) {
         $optionsno->d = $data->id;
         notice_yesno($strwarning, 'preset.php', 'preset.php', $options, $optionsno, 'post', 'get');
         print_footer($course);
-        exit;
+        exit(0);
         break;
 
     case 'delete' :
@@ -123,9 +124,7 @@ switch ($action) {
 
         $strdeleted = get_string('deleted', 'data');
         notify("$shortname $strdeleted", 'notifysuccess');
-
         break;
-
 
         /***************** Importing *****************/
     case 'importpreset' :
@@ -137,7 +136,7 @@ switch ($action) {
         $pimporter->import_options();
 
         print_footer($course);
-        exit;
+        exit(0);
         break;
 
         /* Imports a zip file. */
@@ -161,7 +160,7 @@ switch ($action) {
         $pimporter->import_options();
 
         print_footer($course);
-        exit;
+        exit(0);
         break;
 
     case 'finishimport':
@@ -187,19 +186,18 @@ switch ($action) {
         if (!data_submitted() or !confirm_sesskey()) {
             error("Invalid request");
         }
-
-        echo '<div style="text-align:center">';
-        $file = data_presets_export($course, $cm, $data);
-        echo get_string('exportedtozip', 'data')."<br />";
-        $perminantfile = $CFG->dataroot."/$course->id/moddata/data/$data->id/preset.zip";
-        @unlink($perminantfile);
-        /* is this created elsewhere? sometimes its not present... */
-        make_upload_directory("$course->id/moddata/data/$data->id");
-
-        /* now just move the zip into this folder to allow a nice download */
-        if (!rename($file, $perminantfile)) error("Can't move zip");
-        echo "<a href='$CFG->wwwroot/file.php/$course->id/moddata/data/$data->id/preset.zip'>".get_string('download', 'data')."</a>";
-        echo '</div>';
+        $exportfile = data_presets_export($course, $cm, $data);
+        $exportfilename = basename($exportfile);
+        header("Content-Type: application/download\n");
+        header("Content-Disposition: attachment; filename=$exportfilename");
+        header('Expires: 0');
+        header('Cache-Control: must-revalidate,post-check=0,pre-check=0');
+        header('Pragma: public');
+        $exportfilehandler = fopen($exportfile, 'rb');
+        print fread($exportfilehandler, filesize($exportfile));
+        fclose($exportfilehandler);
+        unlink($exportfile);
+        exit(0);
         break;
 
         /***************** Exporting *****************/
@@ -222,7 +220,7 @@ switch ($action) {
         echo '<input type="hidden" name="sesskey" value="'.$sesskey.'" />';
         echo '<input type="submit" value="'.$strcontinue.'" /></fieldset></form></div>';
         print_footer($course);
-        exit;
+        exit(0);
         break;
 
     case 'save2':
@@ -257,7 +255,7 @@ switch ($action) {
             echo '<input type="submit" value="'.$stroverwrite.'" /></div></form>';
             echo '</div>';
             print_footer($course);
-            exit;
+            exit(0);
             break;
         }
 
@@ -372,5 +370,144 @@ echo '</table>';
 echo '</div>';
 
 print_footer($course);
+exit(0);
+
+################################################################################
+
+
+function data_presets_export($course, $cm, $data) {
+    global $CFG;
+    $presetname = clean_filename($data->name) . '-preset-' . gmdate("Ymd_Hi");
+    $exportsubdir = "$course->id/moddata/data/$data->id/$presetname";
+    make_upload_directory($exportsubdir);
+    $exportdir = "$CFG->dataroot/$exportsubdir";
+
+    // Assemble "preset.xml":
+    $presetxmldata = "<preset>\n\n";
+
+    // Raw settings are not preprocessed during saving of presets
+    $raw_settings = array(
+        'intro',
+        'comments',
+        'requiredentries',
+        'requiredentriestoview',
+        'maxentries',
+        'rssarticles',
+        'approval',
+        'defaultsortdir'
+    );
+
+    $presetxmldata .= "<settings>\n";
+    // First, settings that do not require any conversion
+    foreach ($raw_settings as $setting) {
+        $presetxmldata .= "<$setting>" . htmlspecialchars($data->$setting) . "</$setting>\n";
+    }
+
+    // Now specific settings
+    if ($data->defaultsort > 0 && $sortfield = data_get_field_from_id($data->defaultsort, $data)) {
+        $presetxmldata .= '<defaultsort>' . htmlspecialchars($sortfield->field->name) . "</defaultsort>\n";
+    } else {
+        $presetxmldata .= "<defaultsort>0</defaultsort>\n";
+    }
+    $presetxmldata .= "</settings>\n\n";
+
+    // Now for the fields. Grab all that are non-empty
+    $fields = get_records('data_fields', 'dataid', $data->id);
+    ksort($fields);
+    if (!empty($fields)) {
+        foreach ($fields as $field) {
+            $presetxmldata .= "<field>\n";
+            foreach ($field as $key => $value) {
+                if ($value != '' && $key != 'id' && $key != 'dataid') {
+                    $presetxmldata .= "<$key>" . htmlspecialchars($value) . "</$key>\n";
+                }
+            }
+            $presetxmldata .= "</field>\n\n";
+        }
+    }
+    $presetxmldata .= '</preset>';
+
+    // After opening a file in write mode, close it asap
+    $presetxmlfile = fopen($exportdir . '/preset.xml', 'w');
+    fwrite($presetxmlfile, $presetxmldata);
+    fclose($presetxmlfile);
+
+    // Now write the template files
+    $singletemplate = fopen($exportdir . '/singletemplate.html', 'w');
+    fwrite($singletemplate, $data->singletemplate);
+    fclose($singletemplate);
+
+    $listtemplateheader = fopen($exportdir . '/listtemplateheader.html', 'w');
+    fwrite($listtemplateheader, $data->listtemplateheader);
+    fclose($listtemplateheader);
+
+    $listtemplate = fopen($exportdir . '/listtemplate.html', 'w');
+    fwrite($listtemplate, $data->listtemplate);
+    fclose($listtemplate);
+
+    $listtemplatefooter = fopen($exportdir . '/listtemplatefooter.html', 'w');
+    fwrite($listtemplatefooter, $data->listtemplatefooter);
+    fclose($listtemplatefooter);
+
+    $addtemplate = fopen($exportdir . '/addtemplate.html', 'w');
+    fwrite($addtemplate, $data->addtemplate);
+    fclose($addtemplate);
+
+    $rsstemplate = fopen($exportdir . '/rsstemplate.html', 'w');
+    fwrite($rsstemplate, $data->rsstemplate);
+    fclose($rsstemplate);
+
+    $rsstitletemplate = fopen($exportdir . '/rsstitletemplate.html', 'w');
+    fwrite($rsstitletemplate, $data->rsstitletemplate);
+    fclose($rsstitletemplate);
+
+    $csstemplate = fopen($exportdir . '/csstemplate.css', 'w');
+    fwrite($csstemplate, $data->csstemplate);
+    fclose($csstemplate);
+
+    $jstemplate = fopen($exportdir . '/jstemplate.js', 'w');
+    fwrite($jstemplate, $data->jstemplate);
+    fclose($jstemplate);
+
+    $asearchtemplate = fopen($exportdir . '/asearchtemplate.html', 'w');
+    fwrite($asearchtemplate, $data->asearchtemplate);
+    fclose($asearchtemplate);
+
+    // Check if all files have been generated
+    if (! is_directory_a_preset($exportdir)) {
+        error('Not all files generated!');
+        // should be migrated to print_error()
+    }
+
+    $filelist = array(
+        'preset.xml',
+        'singletemplate.html',
+        'listtemplateheader.html',
+        'listtemplate.html',
+        'listtemplatefooter.html',
+        'addtemplate.html',
+        'rsstemplate.html',
+        'rsstitletemplate.html',
+        'csstemplate.css',
+        'jstemplate.js',
+        'asearchtemplate.html'
+    );
+
+    foreach ($filelist as $key => $file) {
+        $filelist[$key] = $exportdir . '/' . $filelist[$key];
+    }
+
+    $exportfile = "$CFG->dataroot/$course->id/moddata/data/$data->id/$presetname.zip";
+    file_exists($exportfile) && unlink($exportfile);
+    $status = zip_files($filelist, $exportfile);
+    // ToDo: status check
+    foreach ($filelist as $file) {
+        unlink($file);
+    }
+    rmdir($exportdir);
+
+    // Return the full path to the exported preset file:
+    return $exportfile;
+}
 
 ?>

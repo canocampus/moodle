@@ -31,6 +31,7 @@
         $user->id = -1;
         $user->auth = 'manual';
         $user->confirmed = 1;
+        $user->deleted = 0;
     } else {
         // editing existing user
         require_capability('moodle/user:update', $systemcontext);
@@ -52,6 +53,13 @@
         print_error('guestnoeditprofileother');
     }
 
+    if ($user->deleted) {
+        print_header();
+        print_heading(get_string('userdeleted'));
+        print_footer($course);
+        die;
+    }
+
     //load user preferences
     useredit_load_preferences($user);
 
@@ -61,7 +69,7 @@
     //user interests separated by commas
     if (!empty($CFG->usetags)) {
         require_once($CFG->dirroot.'/tag/lib.php');
-        $user->interests = html_entity_decode(tag_get_tags_csv('user', $id, TAG_RETURN_TEXT)); // formslib uses htmlentities itself
+        $user->interests = tag_get_tags_csv('user', $id, TAG_RETURN_TEXT); // formslib uses htmlentities itself
     }
 
     //create form
@@ -91,6 +99,7 @@
             if (!$usernew->id = insert_record('user', $usernew)) {
                 error('Error creating user record');
             }
+            $usercreated = true;
         } else {
             if (!update_record('user', $usernew)) {
                 error('Error updating user record');
@@ -112,9 +121,7 @@
                     }
                 }
             }
-
-            // MDL-9983
-            events_trigger('user_updated', $usernew);
+            $usercreated = false;
         }
 
         //update preferences
@@ -139,10 +146,19 @@
         // save custom profile fields data
         profile_save_data($usernew);
 
+        // reload from db
+        $usernew = get_record('user', 'id', $usernew->id);
+
+        // trigger events
+        if ($usercreated) {
+            events_trigger('user_created', $usernew);
+        } else {
+            events_trigger('user_updated', $usernew);
+        }
+
         if ($user->id == $USER->id) {
             // Override old $USER session variable
-            $usernew = (array)get_record('user', 'id', $usernew->id); // reload from db
-            foreach ($usernew as $variable => $value) {
+            foreach ((array)$usernew as $variable => $value) {
                 $USER->$variable = $value;
             }
             if (!empty($USER->newadminuser)) {

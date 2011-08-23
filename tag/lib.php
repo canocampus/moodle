@@ -32,7 +32,7 @@
  * @licence http://www.gnu.org/copyleft/gpl.html GNU Public License
  * @package moodlecore
  * @subpackage tag
- * @see http://www.php.net/manual/en/function.urlencode.php
+ * @see http://www.php.net/manual/en/function.rawurlencode.php
  */
 
 define('TAG_RETURN_ARRAY', 0);
@@ -46,7 +46,6 @@ define('TAG_CASE_ORIGINAL', 1);
 define('TAG_RELATED_ALL', 0);
 define('TAG_RELATED_MANUAL', 1);
 define('TAG_RELATED_CORRELATED', 2);
-
 
 require_once($CFG->dirroot .'/tag/locallib.php');
 
@@ -299,7 +298,7 @@ function tag_get_tags_csv($record_type, $record_id, $html=TAG_RETURN_HTML, $type
     $tags_names = array();
     foreach(tag_get_tags($record_type, $record_id, $type) as $tag) {
         if ($html == TAG_RETURN_TEXT) {
-            $tags_names[] = tag_display_name($tag);
+            $tags_names[] = tag_display_name($tag, TAG_RETURN_TEXT);
         } else { // TAG_RETURN_HTML
             $tags_names[] = '<a href="'. $CFG->wwwroot .'/tag/index.php?tag='. rawurlencode($tag->name) .'">'. tag_display_name($tag) .'</a>';
         }
@@ -439,7 +438,7 @@ function tag_get_related_tags_csv($related_tags, $html=TAG_RETURN_HTML) {
     $tags_names = array();
     foreach($related_tags as $tag) {
         if ( $html == TAG_RETURN_TEXT) {
-            $tags_names[] = tag_display_name($tag);
+            $tags_names[] = tag_display_name($tag, TAG_RETURN_TEXT);
         } else {
             // TAG_RETURN_HTML
             $tags_names[] = '<a href="'. $CFG->wwwroot .'/tag/index.php?tag='. rawurlencode($tag->name) .'">'. tag_display_name($tag) .'</a>';
@@ -513,7 +512,7 @@ function tag_delete($tagids) {
 
 /**
  * Delete one instance of a tag.  If the last instance was deleted, it will
- * also delete the tag, unless it's type is 'official'.
+ * also delete the tag, unless its type is 'official'.
  *
  * @param string $record_type the type of the record for which to remove the instance
  * @param int $record_id the id of the record for which to remove the instance
@@ -524,9 +523,12 @@ function tag_delete_instance($record_type, $record_id, $tagid) {
     global $CFG;
 
     if ( delete_records('tag_instance', 'tagid', $tagid, 'itemtype', $record_type, 'itemid', $record_id) ) {
-        if ( !record_exists_sql("SELECT * FROM {$CFG->prefix}tag tg, {$CFG->prefix}tag_instance ti ".
-                "WHERE (tg.id = ti.tagid AND ti.tagid = {$tagid} ) OR ".
-                "(tg.id = {$tagid} AND tg.tagtype = 'official')") ) {
+        if ( !record_exists_sql("SELECT tg.id ".
+                                  "FROM {$CFG->prefix}tag tg ".
+                                 "WHERE tg.id = $tagid AND ( tg.tagtype = 'official' OR ".
+                                    "EXISTS (SELECT 1 
+                                               FROM {$CFG->prefix}tag_instance ti 
+                                              WHERE ti.tagid=$tagid) )") ) { 
             return tag_delete($tagid);
         }
     } else {
@@ -541,24 +543,31 @@ function tag_delete_instance($record_type, $record_id, $tagid) {
  * Function that returns the name that should be displayed for a specific tag
  *
  * @param object $tag_object a line out of tag table, as returned by the adobd functions
+ * @param int $html TAG_RETURN_HTML (default) will return htmlspecialchars encoded string, TAG_RETURN_TEXT will not encode.
  * @return string
  */
-function tag_display_name($tag_object) {
+function tag_display_name($tagobject, $html=TAG_RETURN_HTML) {
 
     global $CFG;
 
-    if(!isset($tag_object->name)) {
+    if(!isset($tagobject->name)) {
         return '';
     }
 
     if (empty($CFG->keeptagnamecase)) {
         //this is the normalized tag name
         $textlib = textlib_get_instance();
-        return htmlspecialchars($textlib->strtotitle($tag_object->name));
+        $tagname = $textlib->strtotitle($tagobject->name);
     } else {
         //original casing of the tag name
-        return htmlspecialchars($tag_object->rawname);
+        $tagname = $tagobject->rawname;
     }
+
+    if ($html == TAG_RETURN_TEXT) {
+        return $tagname;
+    } else { // TAG_RETURN_HTML
+        return htmlspecialchars($tagname);
+    } 
 }
 
 /**
@@ -766,7 +775,7 @@ function tag_compute_correlations($min_correlation=2) {
             "WHERE ta.tagid = {$tag->id} AND tb.tagid != {$tag->id} ".
             "GROUP BY tb.tagid ".
             "HAVING nr > $min_correlation ".
-            "ORDER BY nr DESC";  
+            "ORDER BY COUNT(*) DESC";  
 
         $correlated = array();
 

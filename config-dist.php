@@ -132,16 +132,19 @@ $CFG->admin = 'admin';
 // These are additional tweaks for which no GUI exists in Moodle yet.
 //
 //
+// Change the key pair lifetime for Moodle Networking
+// The default is 28 days. You would only want to change this if the key
+// was not getting regenerated for any reason. You would probably want
+// make it much longer. Note that you'll need to delete and manually update
+// any existing key.
+//      $CFG->mnetkeylifetime = 28;
+//
 // Prevent scheduled backups from operating (and hide the GUI for them)
 // Useful for webhost operators who have alternate methods of backups
 //      $CFG->disablescheduledbackups = true;
 //
 // Prevent stats processing and hide the GUI
 //      $CFG->disablestatsprocessing = true;
-//
-// Set global password for "Login as", teacher is prompted only once in each session.
-// Set your own password and tell it only to teachers that should have access to this feature.
-//      $CFG->loginaspassword = 'yoursharedpassword';
 //
 // Setting this to true will enable admins to edit any post at any time
 //      $CFG->admineditalways = true;

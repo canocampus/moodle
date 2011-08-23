@@ -489,6 +489,7 @@ function set_cron_lock($name, $until, $ignorecurrent=false) {
 }
 
 function print_progress($done, $total, $updatetime=5, $sleeptime=1, $donetext='') {
+    static $thisbarid;
     static $starttime;
     static $lasttime;
 
@@ -496,14 +497,26 @@ function print_progress($done, $total, $updatetime=5, $sleeptime=1, $donetext=''
         return;
     }
 
+    // Are we done?
+    if ($done >= $total) {
+        $done = $total;
+        if (!empty($thisbarid)) {
+            $donetext .= ' ('.$done.'/'.$total.') '.get_string('success');
+            print_progress_redraw($thisbarid, $done, $total, 500, $donetext);
+            $thisbarid = $starttime = $lasttime = NULL;
+        }
+        return;
+    }
+
     if (empty($starttime)) {
         $starttime = $lasttime = time();
         $lasttime = $starttime - $updatetime;
+        $thisbarid = uniqid();
         echo '<table width="500" cellpadding="0" cellspacing="0" align="center"><tr><td width="500">';
-        echo '<div id="bar'.$total.'" style="border-style:solid;border-width:1px;width:500px;height:50px;">';
-        echo '<div id="slider'.$total.'" style="border-style:solid;border-width:1px;height:48px;width:10px;background-color:green;"></div>';
+        echo '<div id="bar'.$thisbarid.'" style="border-style:solid;border-width:1px;width:500px;height:50px;">';
+        echo '<div id="slider'.$thisbarid.'" style="border-style:solid;border-width:1px;height:48px;width:10px;background-color:green;"></div>';
         echo '</div>';
-        echo '<div id="text'.$total.'" align="center" style="width:500px;"></div>';
+        echo '<div id="text'.$thisbarid.'" align="center" style="width:500px;"></div>';
         echo '</td></tr></table>';
         echo '</div>';
     }
@@ -522,14 +535,22 @@ function print_progress($done, $total, $updatetime=5, $sleeptime=1, $donetext=''
             $projectedtext = '';
         }
 
-        echo '<script>';
-        echo 'document.getElementById("text'.$total.'").innerHTML = "'.addslashes($donetext).' ('.$done.'/'.$total.') '.$projectedtext.'";'."\n";
-        echo 'document.getElementById("slider'.$total.'").style.width = \''.$width.'px\';'."\n";
-        echo '</script>';
+        $donetext .= ' ('.$done.'/'.$total.') '.$projectedtext;
+        print_progress_redraw($thisbarid, $done, $total, $width, $donetext);
 
         $lasttime = $now;
-        sleep($sleeptime);
     }
+}
+
+// Don't call this function directly, it's called from print_progress.
+function print_progress_redraw($thisbarid, $done, $total, $width, $donetext='') {
+    if (empty($thisbarid)) {
+        return;
+    }
+    echo '<script>';
+    echo 'document.getElementById("text'.$thisbarid.'").innerHTML = "'.addslashes($donetext).'";'."\n";
+    echo 'document.getElementById("slider'.$thisbarid.'").style.width = \''.$width.'px\';'."\n";
+    echo '</script>';
 }
 
 function upgrade_get_javascript() {
@@ -3226,7 +3247,7 @@ class admin_setting_special_coursemanager extends admin_setting_configmulticheck
         if (is_array($this->choices)) {
             return true;
         }
-        if ($roles = get_records('role')) {
+        if ($roles = get_records('role','','','sortorder')) {
             $this->choices = array();
             foreach($roles as $role) {
                 $this->choices[$role->id] = format_string($role->name);
@@ -3413,7 +3434,7 @@ class admin_setting_grade_profilereport extends admin_setting_configselect {
  */
 class admin_setting_special_registerauth extends admin_setting_configselect {
     function admin_setting_special_registerauth() {
-        parent::admin_setting_configselect('registerauth', get_string('selfregistration', 'auth'), get_string('selfregistration_help', 'auth'), 'email', null);
+        parent::admin_setting_configselect('registerauth', get_string('selfregistration', 'auth'), get_string('selfregistration_help', 'auth'), '', null);
     }
 
     function get_defaultsettings() {
@@ -4284,15 +4305,15 @@ function admin_search_settings_html($query) {
 }
 
 /**
- * Internal function - prints list of uninitialised settings
+ * Internal function - returns arrays of html pages with uninitialised settings
  */
 function admin_output_new_settings_by_page($node) {
-    $return = '';
+    $return = array();
 
     if (is_a($node, 'admin_category')) {
         $entries = array_keys($node->children);
         foreach ($entries as $entry) {
-            $return .= admin_output_new_settings_by_page($node->children[$entry]);
+            $return += admin_output_new_settings_by_page($node->children[$entry]);
         }
 
     } else if (is_a($node, 'admin_settingpage')) {
@@ -4304,8 +4325,8 @@ function admin_output_new_settings_by_page($node) {
         }
         if (count($newsettings) > 0) {
             $adminroot =& admin_get_root();
-            $return .= print_heading(get_string('upgradesettings','admin').' - '.$node->visiblename, '', 2, 'main', true);
-            $return .= '<fieldset class="adminsettings">'."\n";
+            $page = print_heading(get_string('upgradesettings','admin').' - '.$node->visiblename, '', 2, 'main', true);
+            $page .= '<fieldset class="adminsettings">'."\n";
             foreach ($newsettings as $setting) {
                 $fullname = $setting->get_full_name();
                 if (array_key_exists($fullname, $adminroot->errors)) {
@@ -4316,10 +4337,11 @@ function admin_output_new_settings_by_page($node) {
                         $data = $setting->get_defaultsetting();
                     }
                 }
-                $return .= '<div class="clearer"><!-- --></div>'."\n";
-                $return .= $setting->output_html($data);
+                $page .= '<div class="clearer"><!-- --></div>'."\n";
+                $page .= $setting->output_html($data);
             }
-            $return .= '</fieldset>';
+            $page .= '</fieldset>';
+            $return[$node->name] = $page;
         }
     }
 

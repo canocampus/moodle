@@ -897,7 +897,7 @@ function print_recent_activity($course) {
                 }
                 $cm = $modinfo->instances[$modname][$instanceid];
                 if (!$cm->uservisible) {
-                    //continue;
+                    continue;
                 }
 
                 if ($log->action == 'add mod') {
@@ -1341,7 +1341,10 @@ function print_section($course, $section, $mods, $modnamesused, $absolute=false,
                 print_spacer(12, 20 * $mod->indent, false);
             }
 
-            $extra = $modinfo->cms[$modnumber]->extra;
+            $extra = '';
+            if (!empty($modinfo->cms[$modnumber]->extra)) {
+                $extra = $modinfo->cms[$modnumber]->extra;
+            }
 
             if ($mod->modname == "label") {
                 if (!$mod->visible) {
@@ -1883,7 +1886,16 @@ function print_course($course) {
                     $aliasnames = get_records('role_names', 'contextid', $context->id,'','roleid,contextid,name');
                 }
 
+                // keep a note of users displayed to eliminate duplicates
+                $usersshown = array();
                 foreach ($rusers as $ra) {
+
+                    // if we've already displayed user don't again
+                    if (in_array($ra->user->id,$usersshown)) {
+                        continue;
+                    }
+                    $usersshown[] = $ra->user->id;
+
                     if ($ra->hidden == 0 || $canseehidden) {
                         $fullname = fullname($ra->user, $canviewfullnames); 
                         if ($ra->hidden == 1) {
@@ -2715,7 +2727,7 @@ function category_delete_full($category, $showfeedback=true) {
 
     if ($courses = get_records('course', 'category', $category->id, 'sortorder ASC')) {
         foreach ($courses as $course) {
-            if (!delete_course($course->id, false)) {
+            if (!delete_course($course, false)) {
                 notify("Error deleting course $course->shortname"); 
                 return false;
             }
@@ -2734,7 +2746,7 @@ function category_delete_full($category, $showfeedback=true) {
     delete_records('course_categories', 'id', $category->id);
     delete_context(CONTEXT_COURSECAT, $category->id);
 
-    events_trigger('category_deleted', $category);
+    events_trigger('course_category_deleted', $category);
 
     notify(get_string('coursecategorydeleted', '', format_string($category->name)), 'notifysuccess'); 
 
@@ -2784,7 +2796,7 @@ function category_delete_move($category, $newparentid, $showfeedback=true) {
     delete_records('course_categories', 'id', $category->id);
     delete_context(CONTEXT_COURSECAT, $category->id);
 
-    events_trigger('category_deleted', $category);
+    events_trigger('course_category_deleted', $category);
 
     notify(get_string('coursecategorydeleted', '', format_string($category->name)), 'notifysuccess'); 
 
@@ -2969,6 +2981,9 @@ function create_course($data) {
 
         add_to_log(SITEID, 'course', 'new', 'view.php?id='.$course->id, $data->fullname.' (ID '.$course->id.')');
 
+        //trigger events
+        events_trigger('course_created', $course);
+
         return $course;
     } 
 
@@ -2976,7 +2991,7 @@ function create_course($data) {
 }
 
 
-/* 
+/**
  * Update a course and return true or false
  *
  * @param object $data  - all the data needed for an entry in the 'course' table
@@ -3061,6 +3076,8 @@ function update_course($data) {
             }
             
         }
+        //trigger events
+        events_trigger('course_updated', $course);
 
         return true;
 
