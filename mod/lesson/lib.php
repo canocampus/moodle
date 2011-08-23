@@ -417,13 +417,11 @@ function lesson_grade_item_update($lesson, $grades=NULL) {
 
     if ($lesson->grade > 0) {
         $params['gradetype']  = GRADE_TYPE_VALUE;
-        $params['grademax']   = 100; //means 100%
+        $params['grademax']   = $lesson->grade;
         $params['grademin']   = 0;
-        $params['multfactor'] = $lesson->grade / 100.0;
 
     } else {
         $params['gradetype']  = GRADE_TYPE_NONE;
-        $params['multfactor'] = 1.0;
     }
 
     if ($grades  === 'reset') {
@@ -654,6 +652,13 @@ function lesson_reset_userdata($data) {
     }
 
     return $status;
+}
+
+/**
+ * Returns all other caps used in module
+ */
+function lesson_get_extra_capabilities() {
+    return array('moodle/site:accessallgroups');
 }
 
 ?>

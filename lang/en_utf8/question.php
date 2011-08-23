@@ -10,7 +10,7 @@ $string['categorycurrentuse'] = 'Use This Category';
 $string['categorymoveto'] = 'Save in Category';
 $string['changepublishstatuscat'] = '<a href=\"$a->caturl\">Category \"$a->name\"</a> in course \"$a->coursename\" will have it\'s sharing status changed from <strong>$a->changefrom to $a->changeto</strong>.';
 $string['cwrqpfs'] = 'Random questions selecting questions from sub categories.';
-$string['cwrqpfsinfo'] = '<p>During the upgrade to Moodle 1.9 we will seperate question categories into
+$string['cwrqpfsinfo'] = '<p>During the upgrade to Moodle 1.9 we will separate question categories into
 different contexts. Some question categories and questions on your site will have to have their sharing
 status changed. This is necessary in the rare case that one or more \'random\' questions in a quiz are set up to select from a mixture of
 shared and unshared categories (as is the case on this site). This happens when a \'random\' question is set to select
@@ -68,6 +68,7 @@ $string['movingquestionsandfiles']= 'Are you sure you want to move question(s) {
 $string['movingquestionsnofiles']=  'Are you sure you want to move question(s) {$a->questions} to context for <strong>\"{$a->tocontext}\"</strong>?<br /> There are <strong>no files</strong> linked from these question(s) in {$a->fromareaname}.';
 $string['needtochoosecat'] = 'You need to choose a category to move this question to or press \'cancel\'.';
 $string['nopermissionadd'] = 'You don\'t have permission to add questions here.';
+$string['nopermissionmove'] = 'You don\'t have permission to move questions from here. You must save the question in this category or save it as a new question.';
 $string['noprobs'] = 'No problems found in your question database.';
 $string['notenoughdatatoeditaquestion'] = 'Neither a question id, nor a category id and question type, was specified.';
 $string['notenoughdatatomovequestions'] = 'You need to provide the question ids of questions you want to move.';
@@ -83,7 +84,7 @@ $string['questioncatsfor'] = 'Question Categories for \'$a\'';
 $string['questiondoesnotexist'] = 'This question does not exist';
 $string['questionsmovedto'] = 'Questions still in use moved to "$a" in the parent course category.';
 $string['questionsrescuedfrom'] = 'Questions saved from context $a.';
-$string['questionsrescuedfrominfo'] = 'These questions (some of which may be hidden) where saved when context $a was deleted because they are still used by some quizzes or other activities.';
+$string['questionsrescuedfrominfo'] = 'These questions (some of which may be hidden) were saved when context $a was deleted because they are still used by some quizzes or other activities.';
 $string['questionuse'] = 'Use question in this activity';
 $string['shareincontext'] = 'Share in context for $a';
 $string['tofilecategory'] = 'Write category to file';
@@ -91,5 +92,8 @@ $string['tofilecontext'] = 'Write context to file';
 $string['unknown'] = 'Unknown';
 $string['unknownquestiontype'] = 'Unknown question type: $a.';
 $string['unpublished'] = 'unshared';
-$string['yourfileshoulddownload'] = 'Your export file should start to download shortly. If not, please <a href=\"$a\">click here</a>.';
+$string['upgradeproblemcategoryloop'] = 'Problem detected when upgrading question categories. There is a loop in the category tree. The affected category ids are $a.';
+$string['upgradeproblemcouldnotupdatecategory'] = 'Could not update question category $a->name ($a->id).';
+$string['upgradeproblemunknowncategory'] = 'Problem detected when upgrading question categories. Category $a->id refers to parent $a->parent, which does not exist. Parent changed to fix problem.';
+$string['yourfileshoulddownload'] = 'Your export file should start to download shortly. If not, please <a href=\"$a\">click here</a>. Parent changed to fix problem.';
 ?>

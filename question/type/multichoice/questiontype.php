@@ -104,6 +104,9 @@ class question_multichoice_qtype extends default_questiontype {
         }
         $options->answers = implode(",",$answers);
         $options->single = $question->single;
+        if(isset($question->layout)){
+             $options->layout = $question->layout;
+        }
         $options->answernumbering = $question->answernumbering;
         $options->shuffleanswers = $question->shuffleanswers;
         $options->correctfeedback = trim($question->correctfeedback);
@@ -321,7 +324,7 @@ class question_multichoice_qtype extends default_questiontype {
                     format_text($answer->answer, FORMAT_MOODLE, $formatoptions, $cmoptions->course);
 
             // Print feedback if feedback is on
-            if (($options->feedback || $options->correct_responses) && ($checked || $options->readonly)) {
+            if (($options->feedback || $options->correct_responses) && $checked) {
                 $a->feedback = format_text($answer->feedback, true, $formatoptions, $cmoptions->course);
             } else {
                 $a->feedback = '';

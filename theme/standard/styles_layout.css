@@ -91,11 +91,11 @@ h6.main {
 }
 
 #redirect #message {
-  
+
 }
 
 #redirect #continue {
-  
+
 }
 
 /* .clearfix {display: inline-table;} */
@@ -344,14 +344,6 @@ div.groupselector {
 
 .pagingbar {
   text-align:center;
-}
-
-.pagingbar a {
-  padding-left: 10px;
-}
-
-.pagingbar .thispage {
-  padding-left: 10px;
 }
 
 table.formtable {
@@ -975,6 +967,10 @@ body#admin-modules table.generaltable td.c0
   padding-top: 0.75em;
 }
 
+#admin-roles-override .sefeoverridenotice {
+  text-align:center;
+}
+
 #admin-lang .generalbox {
   text-align:center;
   margin:auto;
@@ -994,6 +990,7 @@ body#admin-modules table.generaltable td.c0
   margin:auto;
 }
 
+#admin-index .adminerror,
 #admin-index .adminwarning {
   text-align:center;
   border-width: 1px;
@@ -1001,6 +998,7 @@ body#admin-modules table.generaltable td.c0
   margin:20px;
 }
 
+#admin-index .adminerror .singlebutton,
 #admin-index .adminwarning .singlebutton,
 #admin-index #layout-table .singlebutton {
   text-align:center;
@@ -2014,17 +2012,21 @@ body#course-info .generalbox.info {
 }
 
 .categorylist {
-  width:90%;
-  margin-left:auto;
-  margin-right:auto;
+  width: 90%;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .categorylist .category.image {
-  width:20px;
+  width: 20px;
 }
 
 .categorylist .category.number {
-  text-align:right;
+  text-align: right;
+}
+
+.categorylist .category.indentation {
+  width: 1px;
 }
 
 .categoryboxcontent {
@@ -2241,7 +2243,7 @@ div.allcoursegrades {
 }
 
 #grade-aggregation-help dt {
-    margin-top: 15px; 
+    margin-top: 15px;
 }
 
 #grade-aggregation-help dd.example {
@@ -2532,7 +2534,7 @@ body.notes .notesgroup {
   margin-top: 0;
 }
 
-.questioncatategories h3 {
+.questioncategories h3 {
   margin-top: 0;
 }
 
@@ -2738,7 +2740,7 @@ body.notes .notesgroup {
 }
 
 
-.tabrow0 .here a:link, 
+.tabrow0 .here a:link,
 .tabrow0 .here a:visited,
 .tabrow0 .here a.nolink {
   position:relative;
@@ -3204,6 +3206,7 @@ body#user-index .rolesform {
 .picture user,
 .picture teacher {
   width:35px;
+  height:35px;
   vertical-align:top;
 }
 .modform {
@@ -3746,7 +3749,7 @@ body#mod-forum-search .introcontent {
   margin-right: auto;
 }
 
-#mod-lesson-view .invisiblefieldset {
+#mod-lesson-view #content .invisiblefieldset {
   display: block;
   text-align: left;
 }
@@ -3803,6 +3806,10 @@ body#mod-quiz-view .generalbox#feedback .overriddennotice {
 
 #mod-quiz-attempt #timer .generalbox {
   width:150px
+}
+#mod-quiz-attempt.securewindow .que {
+    margin-left: 155px;
+    margin-right: 155px;
 }
 
 #mod-quiz-attempt #timer {
@@ -3986,17 +3993,17 @@ table.quizreviewsummary td.cell {
   padding: 4px;
 }
 
-#mod-quiz-grading table#grading .header .commands 
+#mod-quiz-grading table#grading .header .commands
 {
   display: inline;
 }
 
-#mod-quiz-grading table#grading .picture 
+#mod-quiz-grading table#grading .picture
 {
   width: 40px;
 }
 
-#mod-quiz-grading table#grading td 
+#mod-quiz-grading table#grading td
 {
   border-left-width: 1px;
   border-right-width: 1px;

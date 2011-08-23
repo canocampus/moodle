@@ -79,9 +79,9 @@ class mnet_environment {
             $hostobject->wwwroot            = '';
             $hostobject->ip_address         = '';
             $hostobject->public_key         = '';
-            $hostobject->public_key_expires = '';
-            $hostobject->last_connect_time  = '0';
-            $hostobject->last_log_id        = '0';
+            $hostobject->public_key_expires = 0;
+            $hostobject->last_connect_time  = 0;
+            $hostobject->last_log_id        = 0;
             $hostobject->deleted            = 0;
             $hostobject->name               = 'All Hosts';
 
@@ -148,12 +148,25 @@ class mnet_environment {
     }
 
     function replace_keys() {
+    	global $CFG;
         $this->keypair = array();
         $this->keypair = mnet_generate_keypair();
         $this->public_key         = $this->keypair['certificate'];
+        $this->wwwroot = $CFG->wwwroot;
         $details                  = openssl_x509_parse($this->public_key);
         $this->public_key_expires = $details['validTo_time_t'];
-
+        if (empty($_SERVER['SERVER_ADDR'])) {
+            // SERVER_ADDR is only returned by Apache-like webservers
+            $my_hostname = mnet_get_hostname_from_uri($CFG->wwwroot);
+            $my_ip       = gethostbyname($my_hostname);  // Returns unmodified hostname on failure. DOH!
+            if ($my_ip == $my_hostname) {
+                $this->ip_address = 'UNKNOWN';
+            } else {
+                $this->ip_address = $my_ip;
+            }
+        } else {
+            $this->ip_address = $_SERVER['SERVER_ADDR'];
+        }
         set_config('openssl', implode('@@@@@@@@', $this->keypair), 'mnet');
 
         update_record('mnet_host', $this);

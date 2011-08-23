@@ -175,8 +175,11 @@ function check_entry($form, $course) {
 
         redirect($destination);
 
+    } else if (!isset($CFG->enrol_manual_showhint) or $CFG->enrol_manual_showhint) {
+        $this->errormsg = get_string('enrolmentkeyhint', '', substr($course->password, 0, 1));
+
     } else {
-        $this->errormsg = get_string('enrolmentkeyhint', '', substr($course->password,0,1));
+        $this->errormsg = get_string('enrolmentkeyerror', 'enrol_manual');
     }
 }
 
@@ -214,6 +217,10 @@ function config_form($frm) {
 
     if (!isset( $frm->enrol_manual_keyholderrole )) {
         $frm->enrol_manual_keyholderrole = '';
+    }
+
+    if (!isset($frm->enrol_manual_showhint)) {
+        $frm->enrol_manual_showhint = 1;
     }
 
     include ("$CFG->dirroot/enrol/manual/config.html");
@@ -337,7 +344,7 @@ function cron() {
             }
         }
         $USER = $cronuser;
-        course_setup($course);   // More environment
+        course_setup($SITE);   // More environment
     }
 
     set_config('lastexpirynotify', date('Ymd'));
@@ -390,7 +397,7 @@ function print_enrolmentkeyfrom($course) {
     $contactslisted = false;
     $canseehidden = has_capability('moodle/role:viewhiddenassigns', $context);
     if (!empty($CFG->enrol_manual_keyholderrole)) {
-        if ($contacts = get_role_users($CFG->enrol_manual_keyholderrole, get_context_instance(CONTEXT_COURSE, $course->id),$canseehidden  )) {
+        if ($contacts = get_role_users($CFG->enrol_manual_keyholderrole, get_context_instance(CONTEXT_COURSE, $course->id),true,'','u.lastname ASC',$canseehidden  )) {
             // guest user has a slightly different message
             if ($guest) {
                 print_string('enrolmentkeyfromguest', '', ':<br />' );

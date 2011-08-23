@@ -328,9 +328,16 @@ class quiz_report extends quiz_default_report {
     
     
             // Construct the SQL
-            $select = 'SELECT '.sql_concat('u.id', '\'#\'', $db->IfNull('qa.attempt', '0')).' AS uniqueid, '.
-                ($qmsubselect?$qmsubselect.' AS gradedattempt, ':'').
-                'qa.uniqueid AS attemptuniqueid, qa.id AS attempt, u.id AS userid, u.idnumber, u.firstname, u.lastname, u.picture, '.
+            $select = 'SELECT '.sql_concat('u.id', '\'#\'', $db->IfNull('qa.attempt', '0')).' AS uniqueid, ';
+            if ($qmsubselect) {
+                $select .=
+                    "(CASE " .
+                    "   WHEN $qmsubselect THEN 1" .
+                    "   ELSE 0 " .
+                    "END) AS gradedattempt, ";
+            }
+            
+            $select .='qa.uniqueid AS attemptuniqueid, qa.id AS attempt, u.id AS userid, u.idnumber, u.firstname, u.lastname, u.picture, '.
                 'qa.sumgrades, qa.timefinish, qa.timestart, qa.timefinish - qa.timestart AS duration ';
     
             // This part is the same for all cases - join users and quiz_attempts tables
@@ -657,7 +664,7 @@ class quiz_report extends quiz_default_report {
             $mform->set_data($displayoptions +compact('detailedmarks', 'pagesize'));
             $mform->display();
             //should be quicker than a COUNT to test if there is at least one record :
-            if (get_records('quiz_grades', 'quiz', $quiz->id, '', '*', 0, 1)){
+            if ($showgrades && get_records('quiz_grades', 'quiz', $quiz->id, '', '*', 0, 1)){
                 $imageurl = $CFG->wwwroot.'/mod/quiz/report/overview/overviewgraph.php?id='.$quiz->id;
                 print_heading(get_string('overviewreportgraph', 'quiz_overview'));
                 echo '<div class="mdl-align"><img src="'.$imageurl.'" alt="'.get_string('overviewreportgraph', 'quiz_overview').'" /></div>';

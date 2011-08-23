@@ -31,7 +31,7 @@ $string['chooselanguagesub'] = 'Wählen Sie eine Sprache, die Sie während der I
 $string['closewindow'] = 'Dieses Fenster schließen';
 $string['compatibilitysettingshead'] = 'Prüfung Ihrer PHP-Einstellungen ...';
 $string['compatibilitysettingssub'] = 'Alle Tests sollten vom Server bestätigt werden, damit Moodle später reibungslos laufen kann.';
-$string['componentisuptodate'] = 'Die Komponente ist nicht aktuell.';
+$string['componentisuptodate'] = 'Die Komponente ist aktuell.';
 $string['configfilenotwritten'] = 'Das Installationsscript kann die Datei config.php, welche die gewählten Einstellungen enthält, nicht automatisch erstellen. Der web-user hat keine Schreibrechte für das Moodle-Verzeichnis. Sie können den folgenden Code manuell in der Datei config.php speichern und diese dann ins Hauptverzeichnis Ihrer Moodle-Installation kopieren.';
 $string['configfilewritten'] = 'Die Datei config.php wurde erfolgreich erstellt';
 $string['configurationcompletehead'] = 'Konfiguration ist abgeschlossen';
@@ -40,6 +40,7 @@ $string['continue'] = 'Weiter';
 $string['ctyperecommended'] = 'Die Installation der optionalen Bibliothek ctype wird empfohlen, um die Geschwindigkeit der Website zu steigern. Dies ist besonders wichtig, wenn Sie Sprachen mit anderen als lateinischen Zeichensätzen verwenden.';
 $string['ctyperequired'] = 'Die PHP-Erweiterung ctype wird von Moodle benötigt, um die Geschwindigkeit der Website zu steigern und die Mehrsprachkompatibilität zu ermöglichen.';
 $string['curlrecommended'] = 'Die Installation der optionalen Bibliothek cURL wird empfohlen, um die Netzwerk-Funktionalität von Moodle einzuschalten.';
+$string['curlrequired'] = 'Die PHP-Erweiterung cURL wird von Moodle benötigt, um mit den Moodle Repositories zu kommunizieren';
 $string['customcheck'] = 'Weitere Überprüfungen';
 $string['database'] = 'Datenbank';
 $string['databasecreationsettingshead'] = 'Sie müssen Einstellungen für die Datenbank konfigurieren, in der die meisten Moodle-Daten abgelegt werden. Der Installationsprozess erstellt die Datenbanktabellen automatisch auf der Grundlage der Einstellungen.';
@@ -53,10 +54,10 @@ $string['databasesettingshead'] = 'Sie müssen nun die Einstellungen für die Da
 $string['databasesettingssub'] = '<b>Typ:</b> mysql oder postgres7<br />
 <b>Host:</b> z.B. localhost oder db.isp.com<br />
 <b>Name:</b> Datenbankname, z.B. moodle<br />
-<b>Nutzer:</b> Ihr Anmeldename für die Datenbank<br />
-<b>Passwort:</b> Ihr Passwort für die Datenbank<br />
+<b>User:</b> Ihr Anmeldename für die Datenbank<br />
+<b>Password:</b> Ihr Passwort für die Datenbank<br />
 <b>Tabellen-Prefix:</b> optionaler Prefix für alle Tabellen';
-$string['databasesettingssub_mssql'] = '<b>Typ:</b> SQL*Server (ohne UTF-8)<br />
+$string['databasesettingssub_mssql'] = '<b>Typ:</b> SQL*Server (ohne UTF-8)<b><strong class=\"errormsg\">Experimentell! (nicht für Produktivumgebungen)</strong></b><br /><br />
 <b>Host:</b> z.B. localhost oder db.isp.com<br />
 <b>Name:</b> Datenbankname, z.B. moodle<br />
 <b>User:</b> Ihr Anmeldename für die Datenbank<br />
@@ -101,6 +102,7 @@ $string['databasesettingssub_postgres7'] = '<b>Typ:</b> PostgreSQL<br />
 $string['databasesettingswillbecreated'] = '<b>Hinweis: </b> Das Installationsprogramm wird versuchen, automatisch eine Datenbank anzulegen, sofern diese noch nicht besteht.';
 $string['dataroot'] = 'Daten-Verzeichnis';
 $string['datarooterror'] = 'Das angegebene Datenverzeichnis ist nicht vorhanden und kann nicht angelegt werden. Korrigieren Sie die Pfad-Eingabe oder legen Sie das Verzeichnis manuell an.';
+$string['datarootpublicerror'] = 'Das von Ihnen angegebene Verzeichnis dataroot ist direkt aus dem Internet zugänglich. Sie müssen das Verzeichnis ändern!';
 $string['dbconnectionerror'] = 'Eine Verbindung zur angegebenen Datenbank konnte nicht hergestellt werden. Bitte überprüfen Sie Ihre Eingaben.';
 $string['dbcreationerror'] = 'Fehler beim Anlegen der Datenbank. Die Datenbank konnte mit diesen Einstellungen nicht erstellt werden.';
 $string['dbhost'] = 'Server';
@@ -138,7 +140,7 @@ $string['environmentrequirecustomcheck'] = 'Dieser Test muss erfolgreich verlauf
 $string['environmentrequireinstall'] = 'muss installiert und aktiviert sein.';
 $string['environmentrequireversion'] = 'Version $a->needed ist erforderlich - aktuell ist $a->current installiert.';
 $string['environmentsub'] = 'Es wird geprüft, ob die verschiedenen Komponenten Ihres Systems die Installationsanforderungen erfüllen.';
-$string['environmentxmlerror'] = 'Beim Auslesen der Server-Konfiguration ist ein Fehler aufgetreten ($a->error_code)';
+$string['environmentxmlerror'] = 'Fehler beim Auslesen der Server-Konfiguration ($a->error_code)';
 $string['error'] = 'Fehler';
 $string['fail'] = 'Fehlgeschlagen';
 $string['fileuploads'] = 'Dateien hochladen';
@@ -157,8 +159,8 @@ $string['globalsquoteshelp'] = '<p>Die Kombination von deaktivierten Magic Quote
 <p>Die empfohlene Einstellung ist <b>magic_quotes_gpc = On</b> und <b>register_globals = Off</b> in Ihrer php.ini-Datei</p>
 
 <p>Wenn Sie keinen Zugriff auf die Datei php.ini haben, können Sie die folgende Zeile in der Datei .htaccess im Moodle Verzeichnis einfügen:
-<blockquote>php_value magic_quotes_gpc On</blockquote>
-<blockquote>php_value register_globals Off</blockquote>
+<blockquote><div>php_value magic_quotes_gpc On</div></blockquote>
+<blockquote><div>php_value register_globals Off</div></blockquote>
 </p>';
 $string['globalswarning'] = '<p><strong>Sicherheitshinweis</strong>: Um ordnungsgemäß funktionieren zu können, benötigt <br />Moodle mehrere Änderungen in Ihren aktuellen PHP-Einstellungen.<p/> <p>Sie <em>müssen</em> den Parameter <code>register_globals=off</code> setzen.<p>Diese Einstellung können Sie vornehmen, in dem Sie die Datei <code>php.ini</code>, die Apache/IIS <br />Konfiguration oder die Datei <code>.htaccess</code> bearbeiten.</p>';
 $string['help'] = 'Hilfe';
@@ -173,7 +175,7 @@ $string['magicquotesruntime'] = 'Magic Quotes Run Time';
 $string['magicquotesruntimeerror'] = 'Dies sollte ausgeschaltet sein (\'off\')';
 $string['magicquotesruntimehelp'] = '<p>Magic Quotes Runtime sollte abgeschaltet \'off\' sein, damit Moodle richtig läuft.  </p>
 <p>Normalerweise ist dies der Fall. Prüfen Sie die Einstellung <b>magic_quotes_runtime</b> in der Datei php.ini. </p>
-<p>Wenn Sie keinen Zugriff zur Datei php.ini haben sollten Sie die folgende Zeile in eine Datei .htacess in Ihrem Moodle-Verzeichnis einfügen: <blockquote>php_value magic_quotes_runtime Off</blockquote></p>';
+<p>Wenn Sie keinen Zugriff zur Datei php.ini haben sollten Sie die folgende Zeile in eine Datei .htacess in Ihrem Moodle-Verzeichnis einfügen: <blockquote><div>php_value magic_quotes_runtime Off</div></blockquote></p>';
 $string['mbstringrecommended'] = 'Die Installation der Bibliothek MBSTRING wird zur Leistungsverbesserung dringend empfohlen. Dies ist besonders wichtig, wenn Sie Sprachen mit anderen als lateinischen Zeichensätzen verwenden.';
 $string['memorylimit'] = 'Memory Limit';
 $string['memorylimiterror'] = 'Die PHP-Speichereinstellung memory_limit ist zu niedrig. Dies könnte später zu Problemen führen.';
@@ -183,7 +185,7 @@ $string['memorylimithelp'] = '<p>Die PHP-Einstellung memory_limit für Ihren Ser
 <ol>
 <li>Wenn Sie PHP neu kompilieren können, nehmen Sie die Einstellung <i>--enable-memory-limit</i>. Dann kann Moodle die Einstellung selber vornehmen.
 <li>Wenn Sie Zugriff auf die Datei php.ini haben, können Sie die Einstellung <b>memory_limit</b> selber auf z.B. 40M anpassen. Wenn Sie selber keinen Zugriff haben, fragen Sie den Server-Admin, dies für Sie zu tun.
-<li>Auf einigen PHP-Servern können Sie eine .htaccess-Datei im Moodle-Verzeichnis einrichten. Tragen Sie darin die folgende Zeile ein: <p><blockquote>php_value memory_limit 40M</blockquote></p>
+<li>Auf einigen PHP-Servern können Sie eine .htaccess-Datei im Moodle-Verzeichnis einrichten. Tragen Sie darin die folgende Zeile ein: <p><blockquote><div>php_value memory_limit 40M</div></blockquote></p>
 <p>Achtung: auf einigen Servern hindert diese Einstellung <b>alle</b> PHP-Seiten und Sie erhalten Fehlermeldungen. Entfernen Sie dann den Eintrag in der .htaccess-Datei wieder.</p></li>
 </ol>';
 $string['missingrequiredfield'] = 'Einige erforderliche Felder sind nicht ausgefüllt.';
@@ -256,4 +258,5 @@ $string['wrongzipfilename'] = 'Falscher ZIP-Dateiname';
 $string['wwwroot'] = 'Web-Adresse';
 $string['wwwrooterror'] = 'Diese Web-Adresse scheint nicht gültig zu sein. Moodle ist nicht unter dieser Adresse installiert.';
 $string['xmlrpcrecommended'] = 'Die Installation der optionalen xmlrpc Erweiterung ist für die Moodle-Network Funktionen nützlich.';
+$string['ziprequired'] = 'Die PHP-Erweiterung zip wird ab sofort von Moodle gefordert. Die Pakete info-ZIP oder PclZip werden nicht weiter eingesetzt.';
 ?>

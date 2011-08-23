@@ -830,7 +830,7 @@ define('RESTORE_GROUPS_GROUPINGS', 3);
                 // Looks like it's from Moodle < 1.3. Let's give the course default blocks...
                 $newpage = page_create_object(PAGE_COURSE_VIEW, $restore->course_id);
                 blocks_repopulate_page($newpage);
-            } else if (!empty($CFG->showblocksonmodpages)) {
+            } else {
                 // We just have a blockinfo field, this is a legacy 1.4 or 1.3 backup
                 $blockrecords = get_records_select('block', '', '', 'name, id');
                 $temp_blocks_l = array();
@@ -3390,7 +3390,7 @@ define('RESTORE_GROUPS_GROUPINGS', 3);
 
             //We have to recode the userid field
             if (!$user = backup_getid($restore->backup_unique_code,"user",$group_member->userid)) {
-                debugging("group membership can not be restored, user id $group_member->userid not presetn in backup");
+                debugging("group membership can not be restored, user id $group_member->userid not present in backup");
                 // do not not block the restore 
                 continue;
             }
@@ -4405,6 +4405,18 @@ define('RESTORE_GROUPS_GROUPINGS', 3);
                 } else {
                     $status = false;
                }
+               // MDL-14326 remove empty course modules instance's (credit goes to John T. Macklin from Remote Learner)
+               $course_modules_inst_zero = get_records_sql("SELECT id, course, instance
+                                           FROM {$CFG->prefix}course_modules
+                                           WHERE id = '$cm_module->new_id' AND
+                                                 instance = '0'");
+                                                 
+                    if($course_modules_inst_zero){ // Clean up the invalid instances
+                         foreach($course_modules_inst_zero as $course_modules_inst){
+                             delete_records('course_modules', 'id',$course_modules_inst->id);
+                         }
+                    }
+
             }
         /// Finally, calculate modinfo cache.
             rebuild_course_cache($restore->course_id);
@@ -5612,6 +5624,7 @@ define('RESTORE_GROUPS_GROUPINGS', 3);
                             break;
                         case "GROUPMEMBERSONLY":
                             $this->info->tempmod->groupmembersonly = $this->getContents();
+                            break;
                         case "IDNUMBER":
                             $this->info->tempmod->idnumber = $this->getContents();
                             break;
@@ -7327,7 +7340,7 @@ define('RESTORE_GROUPS_GROUPINGS', 3);
 
         //We compare Moodle's versions
         if ($CFG->version < $info->backup_moodle_version && $status) {
-            $message = new message();
+            $message = new object();
             $message->serverversion = $CFG->version;
             $message->serverrelease = $CFG->release;
             $message->backupversion = $info->backup_moodle_version;

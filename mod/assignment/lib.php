@@ -1042,9 +1042,7 @@ class assignment_base {
         $cm         = $this->cm;
 
         $tabindex = 1; //tabindex for quick grading tabbing; Not working for dropdowns yet
-
-        add_to_log($course->id, 'assignment', 'view submission', 'submissions.php?id='.$this->assignment->id, $this->assignment->id, $this->cm->id);
-
+        add_to_log($course->id, 'assignment', 'view submission', 'submissions.php?id='.$this->cm->id, $this->assignment->id, $this->cm->id);
         $navigation = build_navigation($this->strsubmissions, $this->cm);
         print_header_simple(format_string($this->assignment->name,true), "", $navigation,
                 '', '', true, update_module_button($cm->id, $course->id, $this->strassignment), navmenu($course, $cm));
@@ -2418,7 +2416,7 @@ function assignment_print_recent_activity($course, $viewfullnames, $timestart) {
             continue;
         }
 
-        // the act of sumitting of assignemnt may be considered private - only graders will see it if specified
+        // the act of sumbitting of assignment may be considered private - only graders will see it if specified
         if (empty($CFG->assignment_showrecentsubmissions)) {
             if (!array_key_exists($cm->id, $grader)) {
                 $grader[$cm->id] = has_capability('moodle/grade:viewall', get_context_instance(CONTEXT_MODULE, $cm->id));
@@ -2532,9 +2530,8 @@ function assignment_get_recent_mod_activity(&$activities, &$index, $timestart, $
             $show[] = $submission;
             continue;
         }
-
-        // the act of sumitting of assignemnt may be considered private - only graders will see it if specified
-        if (!empty($CFG->assignment_showrecentsubmissions)) {
+        // the act of submitting of assignment may be considered private - only graders will see it if specified
+        if (empty($CFG->assignment_showrecentsubmissions)) {
             if (!$grader) {
                 continue;
             }
@@ -3054,6 +3051,13 @@ function assignment_reset_course_form_definition(&$mform) {
  */
 function assignment_reset_course_form_defaults($course) {
     return array('reset_assignment_submissions'=>1);
+}
+
+/**
+ * Returns all other caps used in module
+ */
+function assignment_get_extra_capabilities() {
+    return array('moodle/site:accessallgroups', 'moodle/site:viewfullnames');
 }
 
 ?>

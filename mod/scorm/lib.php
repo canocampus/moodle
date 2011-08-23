@@ -47,6 +47,10 @@ function scorm_add_instance($scorm) {
         if (scorm_external_link($scorm->reference) || ((basename($scorm->reference) != 'imsmanifest.xml') && ($scorm->reference[0] != '#'))) {
             // Rename temp scorm dir to scorm id
             $scorm->dir = $CFG->dataroot.'/'.$scorm->course.'/moddata/scorm';
+            if (file_exists($scorm->dir.'/'.$id)) {
+                //delete directory as it shouldn't exist! - most likely there from an old moodle install with old files in dataroot
+                scorm_delete_files($scorm->dir.'/'.$id);
+            }
             rename($scorm->dir.$scorm->datadir,$scorm->dir.'/'.$id);
         }
 
@@ -85,9 +89,9 @@ function scorm_update_instance($scorm) {
             $scorm->launch = $packagedata->launch;
             $scorm->datadir = $packagedata->datadir;
             $scorm->parse = 1;
-            if (!scorm_external_link($scorm->reference)) {
+            if (!scorm_external_link($scorm->reference) && $scorm->reference[0] != '#') { //dont set md5hash if this is from a repo.
                 $scorm->md5hash = md5_file($CFG->dataroot.'/'.$scorm->course.'/'.$scorm->reference);
-            } else {
+            } elseif($scorm->reference[0] != '#') { //dont set md5hash if this is from a repo.
                 $scorm->dir = $CFG->dataroot.'/'.$scorm->course.'/moddata/scorm';
                 $scorm->md5hash = md5_file($scorm->dir.$scorm->datadir.'/'.basename($scorm->reference));
             }
@@ -125,6 +129,7 @@ function scorm_update_instance($scorm) {
     
     if ($result = update_record('scorm', $scorm)) {
         scorm_grade_item_update(stripslashes_recursive($scorm));
+        //scorm_grade_item_update($scorm);  // John Macklins fix - dont think this is needed
     }
 
     return $result;
@@ -491,10 +496,13 @@ function scorm_grade_item_update($scorm, $grades=NULL) {
         require_once($CFG->libdir.'/gradelib.php');
     }
 
-    $params = array('itemname'=>$scorm->name, 'idnumber'=>$scorm->cmidnumber);
+    $params = array('itemname'=>$scorm->name);
+    if (isset($scorm->cmidnumber)) {
+        $params['idnumber'] = $scorm->cmidnumber;
+    }
 
     if (($scorm->grademethod % 10) == 0) { // GRADESCOES
-        if ($maxgrade = count_records_select('scorm_scoes',"scorm='$scorm->id' AND launch<>''")) {
+        if ($maxgrade = count_records_select('scorm_scoes',"scorm='$scorm->id' AND launch<>'".sql_empty()."'")) {
             $params['gradetype'] = GRADE_TYPE_VALUE;
             $params['grademax']  = $maxgrade;
             $params['grademin']  = 0;
@@ -625,6 +633,13 @@ function scorm_reset_userdata($data) {
     // no dates to shift here
 
     return $status;
+}
+
+/**
+ * Returns all other caps used in module
+ */
+function scorm_get_extra_capabilities() {
+    return array('moodle/site:accessallgroups');
 }
 
 ?>

@@ -182,7 +182,7 @@ class moodleform {
         // the _qf__.$this->_formname serves as a marker that form was actually submitted
         if (array_key_exists('_qf__'.$this->_formname, $submission) and $submission['_qf__'.$this->_formname] == 1) {
             if (!confirm_sesskey()) {
-                error('Incorrect sesskey submitted, form not accepted!');
+                print_error('invalidsesskey');
             }
             $files = $_FILES;
         } else {
@@ -555,7 +555,7 @@ class moodleform {
         $mform->setConstants(array($repeathiddenname=>$repeats));
         for ($i=0; $i<$repeats; $i++) {
             foreach ($elementobjs as $elementobj){
-                $elementclone = clone($elementobj);
+                $elementclone = fullclone($elementobj);
                 $name = $elementclone->getName();
                 if (!empty($name)){
                     $elementclone->setName($name."[$i]");
@@ -1060,6 +1060,19 @@ class MoodleQuickForm extends HTML_QuickForm_DHTMLRulesTableless {
         }
     }
 
+    /**
+     * Set constant value not overriden by _POST or _GET
+     * note: this does not work for complex names with [] :-(
+     * @param string $elname name of element
+     * @param mixed $value
+     * @return void
+     */
+    function setConstant($elname, $value) {
+        $this->_constantValues = HTML_QuickForm::arrayMerge($this->_constantValues, array($elname=>$value));
+        $element =& $this->getElement($elname);
+        $element->onQuickFormEvent('updateValue', null, $this);
+    }
+
     function exportValues($elementList= null, $addslashes=true){
         $unfiltered = array();
         if (null === $elementList) {
@@ -1303,7 +1316,7 @@ function validate_' . $this->_formName . '_' . $elementName . '(element) {
   var _qfGroups = {};
   var _qfMsg = \'\';
   var frm = element.parentNode;
-  while (frm && frm.nodeName != "FORM") {
+  while (frm && frm.nodeName.toUpperCase() != "FORM") {
     frm = frm.parentNode;
   }
 ' . join("\n", $jsArr) . '
@@ -1473,8 +1486,8 @@ function validate_' . $this->_formName . '(frm) {
     /**
      * Displays elements without HTML input tags.
      * This method is different to freeze() in that it makes sure no hidden
-     * elements are included in the form. And a 'hardFrozen' element's submitted value is
-     * ignored.
+     * elements are included in the form.
+     * Note: If you want to make sure the submitted value is ignored, please use setDefaults().
      *
      * This function also removes all previously defined rules.
      *
@@ -1801,20 +1814,18 @@ class MoodleQuickForm_Renderer extends HTML_QuickForm_Renderer_Tableless{
         }
 
         if (isset($this->_advancedElements[$name])){
+            require_js(array('yui_yahoo', 'yui_event'));
             // this is tricky - the first submit button on form is "clicked" if user presses enter
             // we do not want to "submit" using advanced button if javascript active
-            $showtext="'".get_string('showadvanced', 'form')."'";
-            $hidetext="'".get_string('hideadvanced', 'form')."'";
-            //onclick returns false so if js is on then page is not submitted.
-            $onclick = 'return showAdvancedOnClick(this, '.$hidetext.', '.$showtext.');';
-            $button_js = '<input name="'.$elementName.'" value="'.$buttonlabel.'" type="button" onclick="'.$onclick.'" />';
             $button_nojs = '<input name="'.$elementName.'" value="'.$buttonlabel.'" type="submit" />';
-            $button = '<script type="text/javascript">
-//<![CDATA[
-document.write("'.addslashes_js($button_js).'")
-//]]>
-</script><noscript><div style="display:inline">'.$button_nojs.'</div></noscript>';  // the extra div should fix xhtml validation
-            
+
+            $buttonlabel = addslashes_js($buttonlabel);
+            $showtext = addslashes_js(get_string('showadvanced', 'form'));
+            $hidetext = addslashes_js(get_string('hideadvanced', 'form'));
+            $button = '<script id="' . $name . '_script" type="text/javascript">' . "
+showAdvancedInit('{$name}_script', '$elementName', '$buttonlabel', '$hidetext', '$showtext');
+" . '</script><noscript><div style="display:inline">'.$button_nojs.'</div></noscript>';  // the extra div should fix xhtml validation
+
             $header_html = str_replace('{button}', $button, $header_html);
         } else {
             $header_html = str_replace('{button}', '', $header_html);

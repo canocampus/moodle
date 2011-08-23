@@ -27,6 +27,7 @@ continue
 ctyperecommended
 ctyperequired
 curlrecommended
+curlrequired
 customcheck
 database
 databasecreationsettingshead
@@ -43,6 +44,7 @@ databasesettingssub_postgres7
 databasesettingswillbecreated
 dataroot
 datarooterror
+datarootpublicerror
 dbconnectionerror
 dbcreationerror
 dbhost
@@ -163,3 +165,4 @@ wrongzipfilename
 wwwroot
 wwwrooterror
 xmlrpcrecommended
+ziprequired

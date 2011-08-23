@@ -300,9 +300,10 @@ function question_context_has_any_questions($context) {
 function get_grade_options() {
     // define basic array of grades
     $grades = array(
-        1,
-        0.9,
-        0.8,
+        1.00,
+        0.90,
+        0.83333,
+        0.80,
         0.75,
         0.70,
         0.66666,
@@ -1471,7 +1472,11 @@ function question_apply_penalty_and_timelimit(&$question, &$state, $attempt, $cm
 function print_question_icon($question, $return = false) {
     global $QTYPES, $CFG;
 
-    $namestr = $QTYPES[$question->qtype]->menu_name();
+    if (array_key_exists($question->qtype, $QTYPES)) {
+        $namestr = $QTYPES[$question->qtype]->menu_name();
+    } else {
+        $namestr = 'missingtype';
+    }
     $html = '<img src="' . $CFG->wwwroot . '/question/type/' .
             $question->qtype . '/icon.gif" alt="' .
             $namestr . '" title="' . $namestr . '" />';
@@ -1505,7 +1510,7 @@ function get_question_image($question) {
 
         } else {
             require_once($CFG->libdir .'/filelib.php');
-            $img = get_file_url("$courseid/{$question->image}");
+            $img = get_file_url("$coursefilesdir/{$question->image}");
         }      
     }
     return $img;
@@ -1923,7 +1928,7 @@ function question_make_default_categories($contexts) {
 function get_categories_for_contexts($contexts, $sortorder = 'parent, sortorder, name ASC') {
     global $CFG;
     return get_records_sql("
-            SELECT *, (SELECT count(1) FROM {$CFG->prefix}question q
+            SELECT c.*, (SELECT count(1) FROM {$CFG->prefix}question q
                     WHERE c.id = q.category AND q.hidden='0' AND q.parent='0') as questioncount
             FROM {$CFG->prefix}question_categories c
             WHERE c.contextid IN ($contexts)

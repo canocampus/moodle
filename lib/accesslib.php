@@ -143,12 +143,13 @@ define('CONTEXT_GROUP', 60);
 define('CONTEXT_MODULE', 70);
 define('CONTEXT_BLOCK', 80);
 
-// capability risks - see http://docs.moodle.org/en/Hardening_new_Roles_system
+// capability risks - see http://docs.moodle.org/en/Development:Hardening_new_Roles_system
 define('RISK_MANAGETRUST', 0x0001);
 define('RISK_CONFIG',      0x0002);
 define('RISK_XSS',         0x0004);
 define('RISK_PERSONAL',    0x0008);
 define('RISK_SPAM',        0x0010);
+define('RISK_DATALOSS',    0x0020);
 
 // rolename displays
 define('ROLENAME_ORIGINAL', 0);// the name as defined in the role definition
@@ -971,9 +972,10 @@ function get_user_courses_bycap($userid, $cap, $accessdata, $doanything, $sort='
         //
         // narrow down where we have the caps to a few contexts
         // this will be a combination of
-        // - categories where we have the rights
-        // - courses    where we have an explicit enrolment OR that have an override
-        // 
+        // - courses    where user has an explicit enrolment
+        // - courses    that have an override (any status) on that capability
+        // - categories where user has the rights (granted status) on that capability
+        //
         $sql = "SELECT ctx.*
                 FROM   {$CFG->prefix}context ctx
                 WHERE  ctx.contextlevel=".CONTEXT_COURSECAT."
@@ -993,7 +995,7 @@ function get_user_courses_bycap($userid, $cap, $accessdata, $doanything, $sort='
             for ($n=0;$n<$cc;$n++) {
                 $catpaths[$n] = "ctx.path LIKE '{$catpaths[$n]}/%'";
             }
-            $catclause = 'OR (' . implode(' OR ', $catpaths) .')';
+            $catclause = 'WHERE (' . implode(' OR ', $catpaths) .')';
         }
         unset($catpaths);
 
@@ -1001,30 +1003,69 @@ function get_user_courses_bycap($userid, $cap, $accessdata, $doanything, $sort='
         if ($doanything) {
             $capany = " OR rc.capability='moodle/site:doanything'";
         }
-        //
-        // Note here that we *have* to have the compound clauses
-        // in the LEFT OUTER JOIN condition for them to return NULL
-        // appropriately and narrow things down...
-        //
-        $sql = "SELECT $coursefields,
-                       ctx.id AS ctxid, ctx.path AS ctxpath,
-                       ctx.depth AS ctxdepth, ctx.contextlevel AS ctxlevel,
-                       cc.path AS categorypath
-                FROM {$CFG->prefix}course c
-                JOIN {$CFG->prefix}course_categories cc
-                  ON c.category=cc.id
-                JOIN {$CFG->prefix}context ctx 
-                  ON (c.id=ctx.instanceid AND ctx.contextlevel=".CONTEXT_COURSE.")
-                LEFT OUTER JOIN {$CFG->prefix}role_assignments ra
-                  ON (ra.contextid=ctx.id AND ra.userid=$userid)
-                LEFT OUTER JOIN {$CFG->prefix}role_capabilities rc
-                  ON (rc.contextid=ctx.id AND (rc.capability='$cap' $capany))
-                WHERE    ra.id IS NOT NULL
-                      OR rc.id IS NOT NULL
-                      $catclause
-                $sort ";
+
+        /// UNION 3 queries:
+        /// - user role assignments in courses
+        /// - user capability (override - any status) in courses
+        /// - user right (granted status) in categories (optionally executed)
+        /// Enclosing the 3-UNION into an inline_view to avoid column names conflict and making the ORDER BY cross-db
+        /// and to allow selection of TEXT columns in the query (MSSQL and Oracle limitation). MDL-16209
+        $sql = "
+            SELECT $coursefields, ctxid, ctxpath, ctxdepth, ctxlevel, categorypath 
+              FROM (
+                    SELECT c.id,
+                           ctx.id AS ctxid, ctx.path AS ctxpath,
+                           ctx.depth AS ctxdepth, ctx.contextlevel AS ctxlevel,
+                           cc.path AS categorypath
+                    FROM {$CFG->prefix}course c
+                    JOIN {$CFG->prefix}course_categories cc
+                      ON c.category=cc.id
+                    JOIN {$CFG->prefix}context ctx
+                      ON (c.id=ctx.instanceid AND ctx.contextlevel=".CONTEXT_COURSE.")
+                    JOIN {$CFG->prefix}role_assignments ra
+                      ON (ra.contextid=ctx.id AND ra.userid=$userid)
+                    UNION
+                    SELECT c.id,
+                           ctx.id AS ctxid, ctx.path AS ctxpath,
+                           ctx.depth AS ctxdepth, ctx.contextlevel AS ctxlevel,
+                           cc.path AS categorypath
+                    FROM {$CFG->prefix}course c
+                    JOIN {$CFG->prefix}course_categories cc
+                      ON c.category=cc.id
+                    JOIN {$CFG->prefix}context ctx
+                      ON (c.id=ctx.instanceid AND ctx.contextlevel=".CONTEXT_COURSE.")
+                    JOIN {$CFG->prefix}role_capabilities rc
+                      ON (rc.contextid=ctx.id AND (rc.capability='$cap' $capany)) ";
+
+        if (!empty($catclause)) { /// If we have found the right in categories, add child courses here too
+            $sql .= "
+                    UNION
+                    SELECT c.id,
+                           ctx.id AS ctxid, ctx.path AS ctxpath,
+                           ctx.depth AS ctxdepth, ctx.contextlevel AS ctxlevel,
+                           cc.path AS categorypath
+                    FROM {$CFG->prefix}course c
+                    JOIN {$CFG->prefix}course_categories cc
+                      ON c.category=cc.id
+                    JOIN {$CFG->prefix}context ctx
+                      ON (c.id=ctx.instanceid AND ctx.contextlevel=".CONTEXT_COURSE.")
+                    $catclause";
+        }
+
+    /// Close the inline_view and join with courses table to get requested $coursefields
+        $sql .= "
+                ) inline_view
+                INNER JOIN {$CFG->prefix}course c
+                    ON inline_view.id = c.id";
+
+    /// To keep cross-db we need to strip any prefix in the ORDER BY clause for queries using UNION
+        $sql .= "
+                " . preg_replace('/[a-z]+\./i', '', $sort); /// Add ORDER BY clause
+
         $rs = get_recordset_sql($sql);
     }
+
+/// Confirm rights (granted capability) for each course returned
     $courses = array();
     $cc = 0; // keep count
     while ($c = rs_fetch_next_record($rs)) {
@@ -1095,7 +1136,7 @@ function get_user_access_sitewide($userid) {
             LEFT OUTER JOIN {$CFG->prefix}role_capabilities rc
                ON (rc.roleid=ra.roleid AND rc.contextid=ra.contextid)
             WHERE ra.userid = $userid AND ctx.contextlevel <= ".CONTEXT_COURSE."
-            ORDER BY ctx.depth, ctx.path";
+            ORDER BY ctx.depth, ctx.path, ra.roleid";
     $rs = get_recordset_sql($sql);
     //
     // raparents collects paths & roles we need to walk up
@@ -1268,19 +1309,26 @@ function load_subcontext($userid, $context, &$accessdata) {
                ON ra.contextid=ctx.id
             WHERE ra.userid = $userid
                   AND (ctx.path = '{$context->path}' OR ctx.path LIKE '{$context->path}/%')
-            ORDER BY ctx.depth, ctx.path";
+            ORDER BY ctx.depth, ctx.path, ra.roleid";
     $rs = get_recordset_sql($sql);
 
-    // 
-    // Read in the RAs
+    //
+    // Read in the RAs, preventing duplicates
     //
     $localroles = array();
+    $lastseen  = '';
     while ($ra = rs_fetch_next_record($rs)) {
         if (!isset($accessdata['ra'][$ra->path])) {
             $accessdata['ra'][$ra->path] = array();
         }
-        array_push($accessdata['ra'][$ra->path], $ra->roleid);
-        array_push($localroles,           $ra->roleid);
+        // only add if is not a repeat caused
+        // by capability join...
+        // (this check is cheaper than in_array())
+        if ($lastseen !== $ra->path.':'.$ra->roleid) {
+            $lastseen = $ra->path.':'.$ra->roleid;
+            array_push($accessdata['ra'][$ra->path], $ra->roleid);
+            array_push($localroles,           $ra->roleid);
+        }
     }
     rs_close($rs);
 
@@ -1853,7 +1901,7 @@ function moodle_install_roles() {
     allow_assign($editteacherrole, $studentrole);
     allow_assign($editteacherrole, $guestrole);
 
-/// Set up default permissions for overrides
+/// Set up default allow override matrix
     allow_override($adminrole, $adminrole);
     allow_override($adminrole, $coursecreatorrole);
     allow_override($adminrole, $noneditteacherrole);
@@ -1861,6 +1909,11 @@ function moodle_install_roles() {
     allow_override($adminrole, $studentrole);
     allow_override($adminrole, $guestrole);
     allow_override($adminrole, $userrole);
+
+    //See MDL-15841
+    //allow_override($editteacherrole, $noneditteacherrole);
+    //allow_override($editteacherrole, $studentrole);
+    //allow_override($editteacherrole, $guestrole);
 
 
 /// Delete the old user tables when we are done
@@ -3312,20 +3365,19 @@ function print_context_name($context, $withprefix = true, $short = false) {
             break;
 
         case CONTEXT_COURSE: // 1 to 1 to course cat
-            if ($course = get_record('course', 'id', $context->instanceid)) {
-                if ($withprefix){
-                    if ($context->instanceid == SITEID) {
-                        $name = get_string('site').': ';
-                    } else {
+            if ($context->instanceid == SITEID) {
+                $name = get_string('frontpage', 'admin');
+            } else {
+                if ($course = get_record('course', 'id', $context->instanceid)) {
+                    if ($withprefix){
                         $name = get_string('course').': ';
                     }
+                    if (!$short){
+                        $name .= format_string($course->shortname);
+                    } else {
+                        $name .= format_string($course->fullname);
+                   }
                 }
-                if ($short){
-                    $name .=format_string($course->shortname);
-                } else {
-                    $name .=format_string($course->fullname);
-               }
-
             }
             break;
 
@@ -3394,45 +3446,86 @@ function fetch_context_capabilities($context) {
 
     global $CFG;
 
-    $sort = 'ORDER BY contextlevel,component,id';   // To group them sensibly for display
+    $sort = 'ORDER BY contextlevel,component,name';   // To group them sensibly for display
 
     switch ($context->contextlevel) {
 
         case CONTEXT_SYSTEM: // all
-            $SQL = "select * from {$CFG->prefix}capabilities";
+            $SQL = "SELECT *
+                      FROM {$CFG->prefix}capabilities";
         break;
 
         case CONTEXT_USER:
+            $extracaps = array('moodle/grade:viewall');
+            foreach ($extracaps as $key=>$value) {
+                $extracaps[$key]= "'$value'";
+            }
+            $extra = implode(',', $extracaps);
             $SQL = "SELECT *
-                    FROM {$CFG->prefix}capabilities
-                    WHERE contextlevel = ".CONTEXT_USER;
+                      FROM {$CFG->prefix}capabilities
+                     WHERE contextlevel = ".CONTEXT_USER."
+                           OR name IN ($extra)";
         break;
 
-        case CONTEXT_COURSECAT: // all
-            $SQL = "select * from {$CFG->prefix}capabilities";
+        case CONTEXT_COURSECAT: // course category context and bellow
+            $SQL = "SELECT *
+                      FROM {$CFG->prefix}capabilities
+                     WHERE contextlevel IN (".CONTEXT_COURSECAT.",".CONTEXT_COURSE.",".CONTEXT_MODULE.",".CONTEXT_BLOCK.")";
         break;
 
-        case CONTEXT_COURSE: // all
-            $SQL = "select * from {$CFG->prefix}capabilities";
-        break;
-
-        case CONTEXT_GROUP: // group caps
+        case CONTEXT_COURSE: // course context and bellow
+            $SQL = "SELECT *
+                      FROM {$CFG->prefix}capabilities
+                     WHERE contextlevel IN (".CONTEXT_COURSE.",".CONTEXT_MODULE.",".CONTEXT_BLOCK.")";
         break;
 
         case CONTEXT_MODULE: // mod caps
             $cm = get_record('course_modules', 'id', $context->instanceid);
             $module = get_record('modules', 'id', $cm->module);
 
-            $SQL = "select * from {$CFG->prefix}capabilities where contextlevel = ".CONTEXT_MODULE."
-                    and component = 'mod/$module->name'";
+            $extra = "";
+            $modfile = "$CFG->dirroot/mod/$module->name/lib.php";
+            if (file_exists($modfile)) {
+                include_once($modfile);
+                $modfunction = $module->name.'_get_extra_capabilities';
+                if (function_exists($modfunction)) {
+                    if ($extracaps = $modfunction()) {
+                        foreach ($extracaps as $key=>$value) {
+                            $extracaps[$key]= "'$value'";
+                        }
+                        $extra = implode(',', $extracaps);
+                        $extra = "OR name IN ($extra)";
+                    }
+                }
+            }
+
+            $SQL = "SELECT *
+                      FROM {$CFG->prefix}capabilities
+                     WHERE (contextlevel = ".CONTEXT_MODULE."
+                           AND component = 'mod/$module->name')
+                           $extra";
         break;
 
         case CONTEXT_BLOCK: // block caps
             $cb = get_record('block_instance', 'id', $context->instanceid);
             $block = get_record('block', 'id', $cb->blockid);
 
-            $SQL = "select * from {$CFG->prefix}capabilities where (contextlevel = ".CONTEXT_BLOCK." AND component = 'moodle')
-                    OR (component = 'block/$block->name')";
+            $extra = "";
+            if ($blockinstance = block_instance($block->name)) {
+                if ($extracaps = $blockinstance->get_extra_capabilities()) {
+                    foreach ($extracaps as $key=>$value) {
+                        $extracaps[$key]= "'$value'";
+                    }
+                    $extra = implode(',', $extracaps);
+                    $extra = "OR name IN ($extra)";
+                }
+            }
+
+            $SQL = "SELECT *
+                      FROM {$CFG->prefix}capabilities
+                     WHERE (contextlevel = ".CONTEXT_BLOCK."
+                           AND component = 'block/$block->name')
+                           $extra";
         break;
 
         default:
@@ -3443,50 +3536,6 @@ function fetch_context_capabilities($context) {
         $records = array();
     }
 
-/// the rest of code is a bit hacky, think twice before modifying it :-(
-
-    // special sorting of core system capabiltites and enrollments
-    if (in_array($context->contextlevel, array(CONTEXT_SYSTEM, CONTEXT_COURSECAT, CONTEXT_COURSE))) {
-        $first = array();
-        foreach ($records as $key=>$record) {
-            if (preg_match('|^moodle/|', $record->name) and $record->contextlevel == CONTEXT_SYSTEM) {
-                $first[$key] = $record;
-                unset($records[$key]);
-            } else if (count($first)){
-                break;
-            }
-        }
-        if (count($first)) {
-           $records = $first + $records; // merge the two arrays keeping the keys
-        }
-    } else {
-        $contextindependentcaps = fetch_context_independent_capabilities();
-        $records = array_merge($contextindependentcaps, $records);
-    }
-
-    return $records;
-
-}
-
-
-/**
- * Gets the context-independent capabilities that should be overrridable in
- * any context.
- * @return array of capability records from the capabilities table.
- */
-function fetch_context_independent_capabilities() {
-
-    //only CONTEXT_SYSTEM capabilities here or it will break the hack in fetch_context_capabilities()
-    $contextindependentcaps = array(
-        'moodle/site:accessallgroups'
-        );
-
-    $records = array();
-
-    foreach ($contextindependentcaps as $capname) {
-        $record = get_record('capabilities', 'name', $capname);
-        array_push($records, $record);
-    }
     return $records;
 }
 
@@ -3899,6 +3948,9 @@ function get_user_roles_in_context($userid, $context, $view=true){
  * @return boolean
  */
 function user_can_override($context, $targetroleid) {
+
+// TODO: not needed anymore, remove in 2.0
+
     // first check if user has override capability
     // if not return false;
     if (!has_capability('moodle/role:override', $context)) {
@@ -4029,43 +4081,38 @@ function allow_assign($sroleid, $troleid) {
  * Gets a list of roles that this user can assign in this context
  * @param object $context
  * @param string $field
+ * @param int $rolenamedisplay
  * @return array
  */
-function get_assignable_roles ($context, $field='name', $rolenamedisplay=ROLENAME_ALIAS) {
+function get_assignable_roles($context, $field='name', $rolenamedisplay=ROLENAME_ALIAS) {
+    global $USER, $CFG;
 
-    global $CFG;
+    if (!has_capability('moodle/role:assign', $context)) {
+        return array();
+    } 
 
-    // this users RAs
-    $ras = get_user_roles($context);
-    $roleids = array();
-    foreach ($ras as $ra) {
-        $roleids[] = $ra->roleid;
-    }
-    unset($ra);
+    $parents = get_parent_contexts($context);
+    $parents[] = $context->id;
+    $contexts = implode(',' , $parents);
 
-    if (count($roleids)===0) {
+    if (!$roles = get_records_sql("SELECT ro.*
+                                     FROM {$CFG->prefix}role ro,
+                                          (
+                                              SELECT DISTINCT r.id
+                                                FROM {$CFG->prefix}role r,
+                                                     {$CFG->prefix}role_assignments ra,
+                                                     {$CFG->prefix}role_allow_assign raa
+                                               WHERE ra.userid = $USER->id AND ra.contextid IN ($contexts)
+                                                 AND raa.roleid = ra.roleid AND r.id = raa.allowassign
+                                          ) inline_view
+                                    WHERE ro.id = inline_view.id
+                                 ORDER BY ro.sortorder ASC")) {
         return array();
     }
 
-    $roleids = implode(',',$roleids);
-
-    // The subselect scopes the DISTINCT down to
-    // the role ids - a DISTINCT over the whole of
-    // the role table is much more expensive on some DBs
-    $sql = "SELECT r.id, r.$field
-              FROM {$CFG->prefix}role r
-                   JOIN ( SELECT DISTINCT allowassign as allowedrole 
-                            FROM  {$CFG->prefix}role_allow_assign raa
-                           WHERE raa.roleid IN ($roleids) ) ar
-                   ON r.id=ar.allowedrole
-            ORDER BY sortorder ASC";
-
-    $rs = get_recordset_sql($sql);
-    $roles = array();
-    while ($r = rs_fetch_next_record($rs)) {
-        $roles[$r->id] = $r->{$field};
+    foreach ($roles as $role) {
+        $roles[$role->id] = $role->$field;
     }
-    rs_close($rs);
 
     return role_fix_names($roles, $context, $rolenamedisplay);
 }
@@ -4073,71 +4120,84 @@ function get_assignable_roles ($context, $field='name', $rolenamedisplay=ROLENAM
 /**
  * Gets a list of roles that this user can assign in this context, for the switchrole menu
  *
- * This is a quick-fix for MDL-13459 until MDL-8312 is sorted out...
  * @param object $context
  * @param string $field
+ * @param int $rolenamedisplay
  * @return array
  */
-function get_assignable_roles_for_switchrole ($context, $field='name', $rolenamedisplay=ROLENAME_ALIAS) {
+function get_assignable_roles_for_switchrole($context, $field='name', $rolenamedisplay=ROLENAME_ALIAS) {
+    global $USER, $CFG;
 
-    global $CFG;
+    if (!has_capability('moodle/role:assign', $context)) {
+        return array();
+    } 
 
-    // this users RAs
-    $ras = get_user_roles($context);
-    $roleids = array();
-    foreach ($ras as $ra) {
-        $roleids[] = $ra->roleid;
-    }
-    unset($ra);
+    $parents = get_parent_contexts($context);
+    $parents[] = $context->id;
+    $contexts = implode(',' , $parents);
 
-    if (count($roleids)===0) {
+    if (!$roles = get_records_sql("SELECT ro.*
+                                     FROM {$CFG->prefix}role ro,
+                                          (
+                                              SELECT DISTINCT r.id
+                                                FROM {$CFG->prefix}role r,
+                                                     {$CFG->prefix}role_assignments ra,
+                                                     {$CFG->prefix}role_allow_assign raa,
+                                                     {$CFG->prefix}role_capabilities rc
+                                               WHERE ra.userid = $USER->id AND ra.contextid IN ($contexts)
+                                                 AND raa.roleid = ra.roleid AND r.id = raa.allowassign
+                                                 AND r.id = rc.roleid AND rc.capability = 'moodle/course:view' AND rc.capability != 'moodle/site:doanything'
+                                          ) inline_view
+                                    WHERE ro.id = inline_view.id
+                                 ORDER BY ro.sortorder ASC")) {
         return array();
     }
 
-    $roleids = implode(',',$roleids);
-
-    // The subselect scopes the DISTINCT down to
-    // the role ids - a DISTINCT over the whole of
-    // the role table is much more expensive on some DBs
-    $sql = "SELECT r.id, r.$field
-             FROM {$CFG->prefix}role r
-                  JOIN ( SELECT DISTINCT allowassign as allowedrole 
-                           FROM  {$CFG->prefix}role_allow_assign raa
-                           WHERE raa.roleid IN ($roleids) ) ar
-                  ON r.id=ar.allowedrole
-                  JOIN {$CFG->prefix}role_capabilities rc
-                  ON (r.id = rc.roleid AND rc.capability = 'moodle/course:view' 
-                      AND rc.capability != 'moodle/site:doanything') 
-         ORDER BY sortorder ASC";
-
-    $rs = get_recordset_sql($sql);
-    $roles = array();
-    while ($r = rs_fetch_next_record($rs)) {
-        $roles[$r->id] = $r->{$field};
+    foreach ($roles as $role) {
+        $roles[$role->id] = $role->$field;
     }
-    rs_close($rs);
 
     return role_fix_names($roles, $context, $rolenamedisplay);
 }
 
 /**
- * Gets a list of roles that this user can override in this context
+ * Gets a list of roles that this user can override or safeoverride in this context
  * @param object $context
+ * @param string $field
+ * @param int $rolenamedisplay
  * @return array
  */
 function get_overridable_roles($context, $field='name', $rolenamedisplay=ROLENAME_ALIAS) {
+    global $USER, $CFG;
 
-    $options = array();
+    if (!has_capability('moodle/role:override', $context) and !has_capability('moodle/role:safeoverride', $context)) {
+        return array();
+    } 
 
-    if ($roles = get_all_roles()) {
-        foreach ($roles as $role) {
-            if (user_can_override($context, $role->id)) {
-                $options[$role->id] = $role->$field;
-            }
-        }
+    $parents = get_parent_contexts($context);
+    $parents[] = $context->id;
+    $contexts = implode(',' , $parents);
+
+    if (!$roles = get_records_sql("SELECT ro.*
+                                     FROM {$CFG->prefix}role ro,
+                                          (
+                                              SELECT DISTINCT r.id
+                                                FROM {$CFG->prefix}role r,
+                                                     {$CFG->prefix}role_assignments ra,
+                                                     {$CFG->prefix}role_allow_override rao
+                                               WHERE ra.userid = $USER->id AND ra.contextid IN ($contexts)
+                                                 AND rao.roleid = ra.roleid AND r.id = rao.allowoverride
+                                          ) inline_view
+                                    WHERE ro.id = inline_view.id
+                                 ORDER BY ro.sortorder ASC")) {
+        return array();
     }
 
-    return role_fix_names($options, $context, $rolenamedisplay);
+    foreach ($roles as $role) {
+        $roles[$role->id] = $role->$field;
+    }
+
+    return role_fix_names($roles, $context, $rolenamedisplay);
 }
 
 /**
@@ -4286,6 +4346,10 @@ function get_users_by_capability($context, $capability, $fields='', $sort='',
     // Prepare query clauses
     //
     $wherecond = array();
+
+    // Non-deleted users. We never return deleted users.
+    $wherecond['nondeleted'] = 'u.deleted = 0';
+
     /// Groups
     if ($groups) {
         if (is_array($groups)) {
@@ -4364,6 +4428,7 @@ function get_users_by_capability($context, $capability, $fields='', $sort='',
             
             return get_records_sql("SELECT $fields
                                     FROM {$CFG->prefix}user u
+                                    WHERE u.deleted = 0
                                     ORDER BY $sort",
                                    $limitfrom, $limitnum);
         }
@@ -4395,10 +4460,6 @@ function get_users_by_capability($context, $capability, $fields='', $sort='',
                                 $sscondhiddenra
                           ) ra ON ra.userid = u.id
                     $uljoin ";
-        $where  = " WHERE u.deleted = 0 ";
-        if (count(array_keys($wherecond))) {
-            $where .= ' AND ' . implode(' AND ', array_values($wherecond));
-        }
         return get_records_sql($select.$from.$where.$sortby, $limitfrom, $limitnum);
     }
 
@@ -4477,10 +4538,6 @@ function get_users_by_capability($context, $capability, $fields='', $sort='',
                JOIN {$CFG->prefix}user u
                  ON ra.userid=u.id
                $uljoin ";
-    $where  = "WHERE u.deleted = 0 ";
-    if (count(array_keys($wherecond))) {
-        $where .= ' AND ' . implode(' AND ', array_values($wherecond));
-    }
 
     // Each user's entries MUST come clustered together
     // and RAs ordered in depth DESC - the role/cap resolution
@@ -4982,7 +5039,7 @@ function get_roles_on_exact_context($context) {
  * The caller *must* check
  * - that this op is allowed
  * - that the requested role can be assigned in this ctx
- *   (hint, use get_assignable_roles())
+ *   (hint, use get_assignable_roles_for_switchrole())
  * - that the requested role is NOT $CFG->defaultuserroleid
  *
  * To "unswitch" pass 0 as the roleid.
@@ -5410,8 +5467,13 @@ function context_moved($context, $newparent) {
     execute_sql($sql,false);
 
     $len = strlen($frompath);
+    /// MDL-16655 - Substring MSSQL function *requires* 3rd parameter
+    $substr3rdparam = '';
+    if ($CFG->dbfamily == 'mssql') {
+        $substr3rdparam = ', len(path)';
+    }
     $sql = "UPDATE {$CFG->prefix}context
-            SET path = ".sql_concat("'$newpath'", 'SUBSTR(path, '.$len.' +1)')."
+            SET path = ".sql_concat("'$newpath'", sql_substr() .'(path, '.$len.' +1'.$substr3rdparam.')')."
                 $setdepth
             WHERE path LIKE '{$frompath}/%'";
     execute_sql($sql,false);

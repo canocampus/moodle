@@ -35,9 +35,10 @@ $string['configfilewritten'] = 'Le fichier «&nbsp;config.php&nbsp;» a été cr
 $string['configurationcompletehead'] = 'Configuration terminée';
 $string['configurationcompletesub'] = 'Moodle a tenté d\'enregistrer votre configuration dans un fichier à la racine de votre installation de Moodle.';
 $string['continue'] = 'Continuer';
-$string['ctyperecommended'] = 'L\'installation de l\'extension PHP optionnelle ctype est vivement recommandée afin d\'améliorer les performances du site, en particulier si votre site utilise des caractères non-latins.';
-$string['ctyperequired'] = 'L\'extension PHP ctype est maintenant requise par Moodle, afin d\'améliorer les performances du site et d\'offrir compatibilité multilingue.';
-$string['curlrecommended'] = 'L\'installation de la bibliothèque optionnelle cURL est vivement recommandée, afin de pouvoir utiliser la fonctionnalité Réseau Moodle.';
+$string['ctyperecommended'] = 'L\'installation de l\'extension optionnelle ctype de PHP est vivement recommandée afin d\'améliorer les performances du site, en particulier si votre site utilise des caractères non-latins.';
+$string['ctyperequired'] = 'L\'installation de l\'extension ctype de PHP est maintenant requise par Moodle, afin d\'améliorer les performances du site et d\'offrir compatibilité multilingue.';
+$string['curlrecommended'] = 'L\'installation de l\'extension optionnelle cURL de PHP est vivement recommandée afin de pouvoir utiliser la fonctionnalité Réseau Moodle.';
+$string['curlrequired'] = 'L\'installation de l\'extension cURL de PHP est maintenant requise par Moodle, afin de pouvoir communiquer avec les dépôts de documents de Moodle.';
 $string['customcheck'] = 'Autres contrôles';
 $string['database'] = 'Base de données';
 $string['databasecreationsettingshead'] = 'La base de données dans laquelle sont enregistrées la plupart des données utilisées par Moodle doit maintenant être configurée. Cette base de données sera créée automatiquement par l\'installeur Moodle4Windows avec les options spécifiées ci-dessous.';
@@ -99,6 +100,7 @@ $string['databasesettingssub_postgres7'] = '<b>Type&nbsp;:</b> PostgreSQL<br />
 $string['databasesettingswillbecreated'] = '<b>Remarque&nbsp;:</b> l\'installeur va essayer de créer automatiquement la base de données, si elle n\'existe pas encore.';
 $string['dataroot'] = 'Dossier de données';
 $string['datarooterror'] = 'Le dossier de données indiqué n\'a pas pu être trouvé ou créé. Veuillez corriger le paramètre ou créer manuellement le dossier.';
+$string['datarootpublicerror'] = 'Le dossier de données que vous avez indiqué est directement accessible depuis le web. Vous devez utiliser un autre dossier.';
 $string['dbconnectionerror'] = 'Moodle n\'a pas pu se connecter à la base de données indiquée. Veuillez vérifier les paramètres de votre base de données';
 $string['dbcreationerror'] = 'Erreur lors de la création de la base de données. Impossible de créer la base de données avec les paramètres fournis';
 $string['dbhost'] = 'Serveur hôte';
@@ -111,7 +113,7 @@ $string['dbwrongprefix'] = 'Vous devez suivre les règles «&nbsp;Préfixe des t
 $string['directorysettingshead'] = 'Veuillez confirmer les emplacements de cette installation de Moodle.';
 $string['directorysettingssub'] = '<b>Adresse web :</b> veuillez indiquer l\'adresse web complète par laquelle on accédera à Moodle. Si votre site web est accessible par plusieurs URL, choisissez celle qui est la plus naturelle ou la plus évidente. Ne placez pas de barre oblique à la fin de l\'adresse.<br /><br />
 <b>Dossier Moodle :</b> veuillez spécifier le chemin complet de cette installation de Moodle («&nbsp;OS path&nbsp;»). Assurez-vous que la casse des caractères (majuscules/minuscules) est correcte.<br /><br />
-<b>Dossier de données :</b> Moodle a besoin d\'un emplacement où enregistrer les fichiers déposés sur le site. Le serveur web (utilisateur dénommé habituellement «&nbsp;www&nbsp;», «&nbsp;apache&nbsp;» ou «&nbsp;nobody&nbsp;») doit avoir accès à ce dossier en lecture et EN ÉCRITURE. Toutefois ce dossier ne devrait pas être accessible directement depuis le web.';
+<b>Dossier de données :</b> Moodle a besoin d\'un emplacement où enregistrer les fichiers déposés sur le site. Le serveur web (utilisateur dénommé habituellement «&nbsp;www&nbsp;», «&nbsp;apache&nbsp;» ou «&nbsp;nobody&nbsp;») doit avoir accès à ce dossier en lecture et EN ÉCRITURE. Toutefois ce dossier ne doit pas être accessible directement depuis le web.';
 $string['dirroot'] = 'Dossier Moodle';
 $string['dirrooterror'] = 'Le dossier Moodle semble incorrect : aucune installation de Moodle ne se trouve dans ce dossier. Le dossier Moodle indiqué ci-dessous est vraisemblablement correct.';
 $string['download'] = 'Télécharger';
@@ -136,12 +138,12 @@ $string['fileuploads'] = 'Téléchargement des fichiers';
 $string['fileuploadserror'] = 'Le téléchargement des fichiers sur le serveur doit être activé';
 $string['fileuploadshelp'] = '<p>Le téléchargement des fichiers semble désactivé sur votre serveur.</p><p>Moodle peut être installé malgré tout, mais personne ne pourra déposer aucun fichier de cours, ni aucune image dans les profils utilisateurs.</p><p>Pour activer le téléchargement des fichiers sur votre serveur, vous (ou l\'administrateur du serveur) devez modifier le fichier «&nbsp;php.ini&nbsp;» du système en donnant au paramètre <b>file_uploads</b> la valeur 1.</p>';
 $string['gdversion'] = 'Version de GD';
-$string['gdversionerror'] = 'La librairie GD doit être activée pour traiter et créer les images';
-$string['gdversionhelp'] = '<p>Il semble que la librairie GD n\'est pas installée sur votre serveur.</p><p>GD est une librairie requise par PHP pour permettre à Moodle de traiter les images (comme les photos des profils) et de créer des graphiques (par exemple ceux des historiques). Moodle fonctionnera sans GD, mais ces fonctionnalités ne seront pas disponibles pour vous.</p><p>Sur Unix ou Mac OS X, pour ajouter GD à PHP, vous pouvez compiler PHP avec l\'option <em>--with-gd</em>.</p><p>Sous Windows, on peut normalement modifier le fichier «&nbsp;php.ini&nbsp;» en enlevant le commentaire de la ligne référençant la librairie php_gd2.dll.</p>';
+$string['gdversionerror'] = 'La bibliothèque GD doit être activée pour traiter et créer les images';
+$string['gdversionhelp'] = '<p>Il semble que la bibliothèque GD n\'est pas installée sur votre serveur.</p><p>GD est une bibliothèque requise par PHP pour permettre à Moodle de traiter les images (comme les photos des profils) et de créer des graphiques (par exemple ceux des historiques). Moodle fonctionnera sans GD, mais ces fonctionnalités ne seront pas disponibles pour vous.</p><p>Sur Unix ou Mac OS X, pour ajouter GD à PHP, vous pouvez compiler PHP avec l\'option <em>--with-gd</em>.</p><p>Sous Windows, on peut normalement modifier le fichier «&nbsp;php.ini&nbsp;» en enlevant le commentaire de la ligne référençant la bibliothèque php_gd2.dll.</p>';
 $string['globalsquotes'] = 'Traitement non sûr des variables globales';
 $string['globalsquoteserror'] = 'Veuillez corriger vos réglages PHP&nbsp;: désactivez «&nbsp;register_globals&nbsp;» et/ou activez «&nbsp;magic_quotes_gpc&nbsp;»';
 $string['globalsquoteshelp'] = '<p>Pour des raisons de sécurité, la combinaison de la désactivation de l\'option «&nbsp;Magic Quotes GPC&nbsp;» et de l\'activation de l\'option «&nbsp;Register Globals&nbsp;» n\'est pas recommandée.</p> <p>Le réglage recommandé est <b>magic_quotes_gpc = On</b> et <b>register_globals = Off</b> dans votre fichier «&nbsp;php.ini&nbsp;».</p> <p>Si vous n\'avez pas accès au fichier «&nbsp;php.ini&nbsp;», il vous est peut-être possible de placer les deux lignes suivantes dans un fichier dénommé «&nbsp;.htaccess&nbsp;» placé dans votre dossier Moodle.</p> <blockquote><div>php_value magic_quotes_gpc On</div></blockquote> <blockquote><div>php_value register_globals Off</div></blockquote>';
-$string['globalswarning'] = '<p><strong>Notification de sécurité</strong>&nbsp;: pour fonctionner correctement, Moodle nécessite <br />certaines modifications de vos réglages PHP actuels.<p/><p>Vous <em>devez</em> effectuer le réglage <code>register_globals=off</code>.<p>Ce réglage s\'effectue en modifiant le fichier <code>php.ini</code>, la configuration <br />de Apache/IIS ou le fichier <code>.htaccess</code>.</p>';
+$string['globalswarning'] = '<p><strong>NOTIFICATION DE SÉCURITÉ&nbsp;!</strong></p><p>Pour fonctionner correctement, Moodle nécessite <br />certaines modifications de vos réglages PHP actuels.<p/><p>Vous <em>devez</em> spécifier le réglage <code>register_globals=off</code>.<p>Ce réglage s\'effectue en modifiant le fichier <code>php.ini</code>, la configuration <br />de Apache/IIS ou le fichier <code>.htaccess</code>.</p>';
 $string['help'] = 'Aide';
 $string['iconvrecommended'] = 'Bien que la bibliothèque ICONV soit facultative, il est vivement recommandé de l\'installer sur le serveur pour de meilleures performance, notamment si votre site supporte des caractères non latins.';
 $string['info'] = 'Information';
@@ -224,5 +226,6 @@ $string['wrongsourcebase'] = 'Adresse URL de base de la source incorrect';
 $string['wrongzipfilename'] = 'Nom de fichier ZIP incorrect';
 $string['wwwroot'] = 'Adresse web';
 $string['wwwrooterror'] = 'L\'adresse web indiquée semble incorrecte&nbsp;: aucune installation de Moodle ne se trouve à cette adresse.';
-$string['xmlrpcrecommended'] = 'L\'installation de l\'extension xmlrpc optionnelle est requise pour l\'utilisation du Réseau Moodle.';
+$string['xmlrpcrecommended'] = 'L\'installation de l\'extension xmlrpc optionnelle de PHP est requise pour l\'utilisation du Réseau Moodle.';
+$string['ziprequired'] = 'L\'extension Zip de PHP est maintenant requise par Moodle. Les exécutables info-ZIP et la bibliothèque PclZip ne sont plus utilisés.';
 ?>

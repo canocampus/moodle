@@ -15,11 +15,11 @@ $string['admindirsettinghead'] = 'Nastavování adresáře \'admin\'...';
 $string['admindirsettingsub'] = 'Na některých serverech je URL adresa /admin vyhrazena pro speciální účely (např. pro ovládací panel). Na takových serverech může dojít ke kolizi se standardním umístěním stránek pro správu Moodlu. Máte-li tento problém, přejmenujte adresář \'admin\' ve vaší instalaci Moodlu a do tohoto pole zadejte jeho nový název. Příklad: <br /> <br /><b>moodleadmin</b><br /> <br />
 Všechny generované odkazy na stránky správy Moodlu budou používat tento nový název.';
 $string['bypassed'] = 'Přeskočeno';
-$string['cannotcreatelangdir'] = 'Nelze vytvořit adresář pro jazykové soubory.';
+$string['cannotcreatelangdir'] = 'Nelze vytvořit adresář pro jazykové soubory';
 $string['cannotcreatetempdir'] = 'Nelze vytvořit dočasný adresář.';
-$string['cannotdownloadcomponents'] = 'Nelze stáhnout komponenty.';
-$string['cannotdownloadzipfile'] = 'Nelze stáhnout soubor ZIP.';
-$string['cannotfindcomponent'] = 'Komponenta nenalezena.';
+$string['cannotdownloadcomponents'] = 'Nelze stáhnout komponenty';
+$string['cannotdownloadzipfile'] = 'Nelze stáhnout soubor ZIP';
+$string['cannotfindcomponent'] = 'Komponenta nenalezena';
 $string['cannotsavemd5file'] = 'Nelze uložit soubor MD5.';
 $string['cannotsavezipfile'] = 'Nelze uložit soubor ZIP.';
 $string['cannotunzipfile'] = 'Nelze dekomprimovat soubor.';
@@ -36,6 +36,8 @@ $string['configfilewritten'] = 'Soubor config.php byl úspěšně vytvořen.';
 $string['configurationcompletehead'] = 'Konfigurace dokončena';
 $string['configurationcompletesub'] = 'Moodle se pokusil uložit soubor s konfigurací do kořenového adresáře instalace Moodlu.';
 $string['continue'] = 'Pokračovat';
+$string['ctyperecommended'] = 'Rozšíření PHP ctype je velmi doporučováno z důvodů výkonu vašich stránek, obzvláště když pracujete s jazyky, které nepoužívají latinku.';
+$string['ctyperequired'] = 'Rozšíření PHP ctype je Moodlem vyžadováno z důvodů výkonu a vícejazyčné podpory.';
 $string['curlrecommended'] = 'Pro běh síťových funkcionalit (\"Moodle Networking\") je potřeba nainstalovat volitelnou knihovnu Curl.';
 $string['customcheck'] = 'Další kontroly';
 $string['database'] = 'Databáze';
@@ -71,6 +73,12 @@ $string['databasesettingssub_mysql'] = '<b>Typ:</b> MySQL<br />
 <b>Uživatel (User):</b> uživatel oprávněný pro práci s databází<br />
 <b>Heslo (Password):</b> heslo pro uživatele<br />
 <b>Předpona (Tables Prefix):</b> jednotná předpona názvů všech tabulek, např. mdl_ (volitelné)';
+$string['databasesettingssub_mysqli'] = '<b>Typ:</b> vylepšené MySQL<br />
+<b>Hostitel:</b> např. localhost nebo db.naseskola.cz<br />
+<b>Název:</b> název databáze, např. moodle<br />
+<b>Uživatel:</b> uživatel dané databáze<br />
+<b>Heslo:</b> heslo uživatele k databázi<br />
+<b>Předpona:</b> jednotná předpona názvů všech tabulek (volitelné)';
 $string['databasesettingssub_oci8po'] = '<b>Typ:</b> Oracle<br />
 <b>Hostitel (Host):</b> nepoužito, musí být prázdné<br />
 <b>Název (Name):</b> daný název připojení tnsnames.ora<br />
@@ -89,8 +97,10 @@ $string['databasesettingssub_postgres7'] = '<b>Typ:</b> PostgreSQL<br />
 <b>Uživatel (User):</b> uživatel oprávněný pro práci s databází<br />
 <b>Heslo (Password):</b> heslo pro uživatele<br />
 <b>Předpona (Tables Prefix):</b> jednotná předpona názvů všech tabulek, např. mdl_ (povinné)';
+$string['databasesettingswillbecreated'] = '<b>Poznámka:</b> instalátor se pokusí vytvořit databázi automaticky, pokud ještě neexistuje';
 $string['dataroot'] = 'Datový adresář';
 $string['datarooterror'] = 'Zadaný datový adresář se nepodařilo nalézt nebo vytvořit. Buď opravte zadanou cestu, nebo vytvořte adresář ručně.';
+$string['datarootpublicerror'] = 'Zadaný datový adresář (dataroot) je přímo dostupný přes WWW. Zvolte jiné umístění.';
 $string['dbconnectionerror'] = 'Nepodařilo se připojit k databázi, kterou jste zadali. Zkontrolujte prosím nastavení databáze.';
 $string['dbcreationerror'] = 'Chyba při vytváření databáze. Nelze vytvořit databázi zadaného jména a nastavení.';
 $string['dbhost'] = 'Hostitelský server';
@@ -202,6 +212,8 @@ $string['mysql'] = 'MySQL (mysql)';
 $string['mysql416bypassed'] = 'Pokud ovšem ve vaší instalaci Moodlu používáte POUZE jazyky založené na latince (iso-8859-1), můžete nadále používat momentálně nainstalovanou verzi MySQL 4.1.12 (nebo vyšší).';
 $string['mysql416required'] = 'Minimální verzí požadovanou pro Moodle 1.6 -- a pro pozdější bezpečný převod všech dat do UTF-8 -- je MySQL 4.1.16.';
 $string['mysqlextensionisnotpresentinphp'] = 'PHP nebylo korektně nakonfigurováno pro komunikaci s MySQL. Zkontrolujte váš php.ini nebo překompilujte PHP.';
+$string['mysqli'] = 'Vylepšené MySQL (mysqli)';
+$string['mysqliextensionisnotpresentinphp'] = 'PHP není korektně nakonfigurováno, aby mohlo s MySQL serverem komunikovat s podporou rozšíření MySQLi. Zkontrolujte nastavení v souboru php.ini nebo překompilujte PHP. Rozšíření MySQLi není k dispozici ve verzi PHP 4.';
 $string['name'] = 'Název';
 $string['next'] = 'Další';
 $string['oci8po'] = 'Oracle (oci8po)';
@@ -225,6 +237,7 @@ $string['postgres7'] = 'PostgreSQL (postgres7)';
 $string['previous'] = 'Předchozí';
 $string['qtyperqpwillberemoved'] = 'Během upgrade bude odstraněn typ testové úlohy RQP. Tento typ jste nepoužívali, takže byste neměli zaznamenta žádné problémy.';
 $string['qtyperqpwillberemovedanyway'] = 'Během upgrade bude odstraněn typ testové úlohy RQP. Ve vaší databázi existuje několik takových úloh a ty nebudou fungovat, dokud nepřeinstalujete kód z http://moodle.org/mod/data/view.php?d=13&amp;rid=797 před pokračováním upgrade.';
+$string['remotedownloaderror'] = 'Stahování komponenty na váš server selhalo. Prověřte nastavení proxy. Vřele doporučujeme PHP rozšíření cURL.<br /><br />Nyní musíte stáhnout soubor <a href=\"$a->url\">$a->url</a> ručně, překopírovat jej do \"$a->dest\" na vašem serveru a tam jej rozbalit.';
 $string['remotedownloadnotallowed'] = 'Stahování komponent na server není povoleno (direktiva allow_url_fopen je ve stavu \'vypnuto\').<br /><br />Musíte soubor stáhnout <a href=\"$a->url\">$a->url</a> ručně, zkopírovat jej na serveru do umístění \"$a->dest\" a tam jej dekomprimovat.';
 $string['report'] = 'Sestava';
 $string['restricted'] = 'Nedostupné';
@@ -262,4 +275,5 @@ $string['wrongzipfilename'] = 'Chybné jméno souboru ZIP';
 $string['wwwroot'] = 'Webová adresa';
 $string['wwwrooterror'] = 'Parametr \'Webová adresa\' je zřejmě nastaven nesprávně -- v zadaném umístění se nepodařilo najít instalaci Moodlu. Ve formuláři níže byla automaticky nastavena výchozí hodnota.';
 $string['xmlrpcrecommended'] = 'Instalace rozšíření pro podporu XML-RPC je velmi užitečná pro síťové funkce Moodlu.';
+$string['ziprequired'] = 'PHP rozšíření ZIP je povinné. Nelze již používat binárky info-ZIP nebo knihovnu PclZip.';
 ?>

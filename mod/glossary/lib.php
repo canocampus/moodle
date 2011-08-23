@@ -331,7 +331,7 @@ function glossary_get_user_grades($glossary, $userid=0) {
 /**
  * Update grades by firing grade_updated event
  *
- * @param object $glossary null means all glossaries
+ * @param object $glossary null means all glossaries (with extra cmidnumber property)
  * @param int $userid specific user only, 0 mean all
  */
 function glossary_update_grades($glossary=null, $userid=0, $nullifnone=true) {
@@ -381,13 +381,8 @@ function glossary_grade_item_update($glossary, $grades=NULL) {
     if (!function_exists('grade_update')) { //workaround for buggy PHP versions
         require_once($CFG->libdir.'/gradelib.php');
     }
-    if(!empty($glossary->cmidnumber)){
-        $params = array('itemname'=>$glossary->name, 'idnumber'=>$glossary->cmidnumber);
-    }else{
-        // MDL-14303
-        $cm = get_coursemodule_from_instance('glossary', $glossary->id);
-        $params = array('itemname'=>$glossary->name, 'idnumber'=>$cm->id);
-    }
+
+    $params = array('itemname'=>$glossary->name, 'idnumber'=>$glossary->cmidnumber);
 
     if (!$glossary->assessed or $glossary->scale == 0) {
         $params['gradetype'] = GRADE_TYPE_NONE;
@@ -685,7 +680,7 @@ function glossary_print_entry_default ($entry) {
 function  glossary_print_entry_concept($entry) {
     $options = new object();
     $options->para = false;
-    $text = format_text(print_heading($entry->concept, '', 3, 'nolink', true), FORMAT_MOODLE, $options);
+    $text = format_text(print_heading('<span class="nolink">' . $entry->concept . '</span>', '', 3, 'nolink', true), FORMAT_MOODLE, $options);
     if (!empty($entry->highlight)) {
         $text = highlight($entry->highlight, $text);
     }
@@ -725,7 +720,7 @@ function glossary_print_entry_definition($entry) {
 
 
     //Extract <a>..><a> tags from definition
-    preg_match_all('/<a[^>]+?>(.*?)<\/a>/is',$definition,$list_of_a);
+    preg_match_all('/<a\s[^>]+?>(.*?)<\/a>/is',$definition,$list_of_a);
 
     //Save them into links array to use them later
     foreach (array_unique($list_of_a[0]) as $key=>$value) {
@@ -2328,6 +2323,13 @@ function glossary_reset_userdata($data) {
     }
 
     return $status;
+}
+
+/**
+ * Returns all other caps used in module
+ */
+function glossary_get_extra_capabilities() {
+    return array('moodle/site:accessallgroups', 'moodle/site:viewfullnames', 'moodle/site:trustcontent');
 }
 
 ?>

@@ -47,7 +47,14 @@ class user_edit_form extends moodleform {
         // if language does not exist, use site default lang
         if ($langsel = $mform->getElementValue('lang')) {
             $lang = reset($langsel);
-            if (!file_exists($CFG->dataroot.'/lang/'.$lang) and 
+            // missing _utf8 in language, add it before further processing. MDL-11829 MDL-16845
+            if (strpos($lang, '_utf8') === false) {
+                $lang = $lang . '_utf8';
+                $lang_el =& $mform->getElement('lang');
+                $lang_el->setValue($lang);
+            }
+            // check lang exists
+            if (!file_exists($CFG->dataroot.'/lang/'.$lang) and
               !file_exists($CFG->dirroot .'/lang/'.$lang)) {
                 $lang_el =& $mform->getElement('lang');
                 $lang_el->setValue($CFG->lang);
@@ -68,7 +75,6 @@ class user_edit_form extends moodleform {
 
             /// disable fields that are locked by auth plugins
             $fields = get_user_fieldnames();
-            $freezefields = array();
             $authplugin = get_auth_plugin($user->auth);
             foreach ($fields as $field) {
                 if (!$mform->elementExists($field)) {
@@ -77,13 +83,15 @@ class user_edit_form extends moodleform {
                 $configvariable = 'field_lock_' . $field;
                 if (isset($authplugin->config->{$configvariable})) {
                     if ($authplugin->config->{$configvariable} === 'locked') {
-                        $freezefields[] = $field;
+                        $mform->hardFreeze($field);
+                        $mform->setConstant($field, $user->$field);
                     } else if ($authplugin->config->{$configvariable} === 'unlockedifempty' and $user->$field != '') {
-                        $freezefields[] = $field;
+                        $mform->hardFreeze($field);
+                        $mform->setConstant($field, $user->$field);
                     }
                 }
             }
-            $mform->hardFreeze($freezefields);
+            
         }
 
         /// Next the customisable profile fields
@@ -108,6 +116,13 @@ class user_edit_form extends moodleform {
 
         if ($usernew->email === $user->email and over_bounce_threshold($user)) {
             $errors['email'] = get_string('toomanybounces');
+        }
+
+        if (!empty($CFG->verifychangedemail) and !isset($errors['email']) and !has_capability('moodle/user:update', get_context_instance(CONTEXT_SYSTEM))) {
+            $errorstr = email_is_not_allowed($usernew->email);
+            if ($errorstr !== false) {
+                $errors['email'] = $errorstr;
+            }
         }
 
         /// Next the customisable profile fields

@@ -84,6 +84,7 @@ function setup_enrolments(&$user) {
                 //$count = 0;
                 $courselist = array();
                 while ($fields_obj = rs_fetch_next_record($rs)) {         // Make a nice little array of courses to process
+                    $fields_obj = (object)array_change_key_case((array)$fields_obj , CASE_LOWER);
                     $courselist[] = $fields_obj->enrolremotecoursefield;
                     //$count++;
                 }
@@ -222,7 +223,8 @@ function sync_enrolments($role = null) {
     begin_sql();
     $extcourses = array();
     while ($extcourse_obj = rs_fetch_next_record($rs)) { // there are more course records
-        $extcourse = $extcourse_obj->{$CFG->enrol_remotecoursefield};
+        $extcourse_obj = (object)array_change_key_case((array)$extcourse_obj , CASE_LOWER);
+        $extcourse = $extcourse_obj->{strtolower($CFG->enrol_remotecoursefield)};
         array_push($extcourses, $extcourse);
 
         // does the course exist in moodle already?
@@ -279,7 +281,8 @@ function sync_enrolments($role = null) {
 
         // slurp results into an array
         while ($crs_obj = rs_fetch_next_record($crs)) {
-            array_push($extenrolments, $crs_obj->{$CFG->enrol_remoteuserfield});
+            $crs_obj = (object)array_change_key_case((array)$crs_obj , CASE_LOWER);
+            array_push($extenrolments, $crs_obj->{strtolower($CFG->enrol_remoteuserfield)});
         }
         rs_close($crs); // release the handle
 
@@ -392,6 +395,7 @@ function sync_enrolments($role = null) {
         }
         if ( !$ers->EOF ) {
             while ($user_obj = rs_fetch_next_record($ers)) {
+                $user_obj = (object)array_change_key_case((array)$user_obj , CASE_LOWER);
                 $roleid     = $user_obj->roleid;
                 $user       = $user_obj->userid;
                 $contextid  = $user_obj->contextid;

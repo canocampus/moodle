@@ -1799,7 +1799,7 @@ class hotpot_xml_quiz extends hotpot_xml_tree {
         if (!isset($this->baseurl)) {
             global $CFG;
             require_once($CFG->libdir.'/filelib.php');
-            $this->baseurl = get_file_url($this->filedir .'/');
+            $this->baseurl = get_file_url($this->filedir).'/';
         }
         return $this->baseurl;
     }
@@ -2601,6 +2601,13 @@ END_OF_SCRIPT;
     } else {
         print $html;
     }
+}
+
+/**
+ * Returns all other caps used in module
+ */
+function hotpot_get_extra_capabilities() {
+    return array('moodle/site:accessallgroups');
 }
 
 ?>

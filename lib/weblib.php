@@ -93,14 +93,14 @@ define('REQUIREJS_AFTERHEADER',  2);
  */
 global $ALLOWED_TAGS;
 $ALLOWED_TAGS =
-'<p><br><b><i><u><font><table><tbody><span><div><tr><td><th><ol><ul><dl><li><dt><dd><h1><h2><h3><h4><h5><h6><hr><img><a><strong><emphasis><em><sup><sub><address><cite><blockquote><pre><strike><param><acronym><nolink><lang><tex><algebra><math><mi><mn><mo><mtext><mspace><ms><mrow><mfrac><msqrt><mroot><mstyle><merror><mpadded><mphantom><mfenced><msub><msup><msubsup><munder><mover><munderover><mmultiscripts><mtable><mtr><mtd><maligngroup><malignmark><maction><cn><ci><apply><reln><fn><interval><inverse><sep><condition><declare><lambda><compose><ident><quotient><exp><factorial><divide><max><min><minus><plus><power><rem><times><root><gcd><and><or><xor><not><implies><forall><exists><abs><conjugate><eq><neq><gt><lt><geq><leq><ln><log><int><diff><partialdiff><lowlimit><uplimit><bvar><degree><set><list><union><intersect><in><notin><subset><prsubset><notsubset><notprsubset><setdiff><sum><product><limit><tendsto><mean><sdev><variance><median><mode><moment><vector><matrix><matrixrow><determinant><transpose><selector><annotation><semantics><annotation-xml><tt><code>';
+'<p><br><b><i><u><font><table><tbody><thead><tfoot><span><div><tr><td><th><ol><ul><dl><li><dt><dd><h1><h2><h3><h4><h5><h6><hr><img><a><strong><emphasis><em><sup><sub><address><cite><blockquote><pre><strike><param><acronym><nolink><lang><tex><algebra><math><mi><mn><mo><mtext><mspace><ms><mrow><mfrac><msqrt><mroot><mstyle><merror><mpadded><mphantom><mfenced><msub><msup><msubsup><munder><mover><munderover><mmultiscripts><mtable><mtr><mtd><maligngroup><malignmark><maction><cn><ci><apply><reln><fn><interval><inverse><sep><condition><declare><lambda><compose><ident><quotient><exp><factorial><divide><max><min><minus><plus><power><rem><times><root><gcd><and><or><xor><not><implies><forall><exists><abs><conjugate><eq><neq><gt><lt><geq><leq><ln><log><int><diff><partialdiff><lowlimit><uplimit><bvar><degree><set><list><union><intersect><in><notin><subset><prsubset><notsubset><notprsubset><setdiff><sum><product><limit><tendsto><mean><sdev><variance><median><mode><moment><vector><matrix><matrixrow><determinant><transpose><selector><annotation><semantics><annotation-xml><tt><code>';
 
 /**
  * Allowed protocols - array of protocols that are safe to use in links and so on
  * @global string $ALLOWED_PROTOCOLS
  */
 $ALLOWED_PROTOCOLS = array('http', 'https', 'ftp', 'news', 'mailto', 'rtsp', 'teamspeak', 'gopher', 'mms',
-                           'color', 'callto', 'cursor', 'text-align', 'font-size', 'font-weight', 'font-style',
+                           'color', 'callto', 'cursor', 'text-align', 'font-size', 'font-weight', 'font-style', 'font-family',
                            'border', 'margin', 'padding', 'background', 'text-decoration');   // CSS as well to get through kses
 
 
@@ -688,7 +688,7 @@ if (!function_exists('stripos')) {    /// Only exists in PHP 5
  *
  * $url must be relative to home page  eg /mod/survey/stuff.php
  * @param string $url Web link relative to home page
- * @param string $name Name to be assigned to the popup window (this is used by 
+ * @param string $name Name to be assigned to the popup window (this is used by
  *   client-side scripts to "talk" to the popup window)
  * @param string $linkname Text to be displayed as web link
  * @param int $height Height to assign to popup window
@@ -739,7 +739,7 @@ function element_to_popup_window ($type=null, $url=null, $name=null, $linkname=n
     } else {
         $name = 'popup';
     }
-    
+
     // get some default string, using the localized version of legacy defaults
     if (is_null($linkname) || $linkname === '') {
         $linkname = get_string('clickhere');
@@ -925,7 +925,7 @@ function choose_from_menu ($options, $name, $selected='', $nothing='choose', $sc
  * Choose value 0 or 1 from a menu with options 'No' and 'Yes'.
  * Other options like choose_from_menu.
  * @param string $name
- * @param string $selected 
+ * @param string $selected
  * @param string $string (defaults to '')
  * @param boolean $return whether this function should return a string or output it (defaults to false)
  * @param boolean $disabled (defaults to false)
@@ -1176,18 +1176,18 @@ $targetwindow='self', $selectlabel='', $optionsextra=NULL) {
         $selectlabel = '<label for="'.$formid.'_jump">'.$selectlabel.'</label>';
     }
 
-    //IE and Opera fire the onchange when ever you move into a dropdwown list with the keyboard. 
+    //IE and Opera fire the onchange when ever you move into a dropdwown list with the keyboard.
     //onfocus will call a function inside dropdown.js. It fixes this IE/Opera behavior.
-    //Note: There is a bug on Opera+Linux with the javascript code (first mouse selection is inactive), 
+    //Note: There is a bug on Opera+Linux with the javascript code (first mouse selection is inactive),
     //so we do not fix the Opera behavior on Linux
     if (check_browser_version('MSIE') || (check_browser_version('Opera') && !check_browser_operating_system("Linux"))) {
         $output .= '<div>'.$selectlabel.$button.'<select id="'.$formid.'_jump" onfocus="initSelect(\''.$formid.'\','.$targetwindow.')" name="jump">'."\n";
     }
     //Other browser
     else {
-        $output .= '<div>'.$selectlabel.$button.'<select id="'.$formid.'_jump" name="jump" onchange="'.$targetwindow.'.location=document.getElementById(\''.$formid.'\').jump.options[document.getElementById(\''.$formid.'\').jump.selectedIndex].value;">'."\n";  
+        $output .= '<div>'.$selectlabel.$button.'<select id="'.$formid.'_jump" name="jump" onchange="'.$targetwindow.'.location=document.getElementById(\''.$formid.'\').jump.options[document.getElementById(\''.$formid.'\').jump.selectedIndex].value;">'."\n";
     }
-    
+
     if ($nothing != '') {
         $output .= "   <option value=\"javascript:void(0)\">$nothing</option>\n";
     }
@@ -1697,9 +1697,12 @@ function format_string ($string, $striplinks=true, $courseid=NULL ) {
     if (!empty($CFG->formatstringstriptags)) {
         $string = strip_tags($string);
 
-    // Otherwise strip just links if that is required (default)
-    } else if ($striplinks) {  //strip links in string
-        $string = preg_replace('/(<a[^>]+?>)(.+?)(<\/a>)/is','$2',$string);
+    } else {
+        // Otherwise strip just links if that is required (default)
+        if ($striplinks) {  //strip links in string
+            $string = preg_replace('/(<a\s[^>]+?>)(.+?)(<\/a>)/is','$2',$string);
+        }
+        $string = clean_text($string);
     }
 
     //Store to cache
@@ -2007,6 +2010,7 @@ function purify_html($text) {
         $config->set('HTML', 'Doctype', 'XHTML 1.0 Transitional');
         $config->set('Cache', 'SerializerPath', $cachedir);
         $config->set('URI', 'AllowedSchemes', array('http'=>1, 'https'=>1, 'ftp'=>1, 'irc'=>1, 'nntp'=>1, 'news'=>1, 'rtsp'=>1, 'teamspeak'=>1, 'gopher'=>1, 'mms'=>1));
+        $config->set('Attr', 'AllowedFrameTargets', array('_blank'));
         $purifier = new HTMLPurifier($config);
     }
     return $purifier->purify($text);
@@ -2234,11 +2238,11 @@ function html_to_text($html) {
     require_once($CFG->libdir .'/html2text.php');
 
     $result = html2text($html);
-    
+
     // html2text does not fix numerical entities so handle those here.
     $tl=textlib_get_instance();
     $result = $tl->entities_to_utf8($result,false);
-    
+
     return $result;
 }
 
@@ -2493,10 +2497,19 @@ function print_header ($title='', $heading='', $navigation='', $focus='',
         $button = '&nbsp;';
     }
 
+    if (file_exists($CFG->dataroot.'/'.SITEID.'/maintenance.html')) {
+        $button = '<a href="'.$CFG->wwwroot.'/admin/maintenance.php">'.get_string('maintenancemode', 'admin').'</a> '.$button;
+        if(!empty($title)) {
+            $title .= ' - ';
+        }
+        $title .= get_string('maintenancemode', 'admin');
+    }
+
     if (!$menu and $navigation) {
         if (empty($CFG->loginhttps)) {
             $wwwroot = $CFG->wwwroot;
         } else {
+
             $wwwroot = str_replace('http:','https:',$CFG->wwwroot);
         }
         $menu = user_login_string($COURSE);
@@ -2988,7 +3001,7 @@ function current_theme() {
         $themeorder = $CFG->themeorder;
     }
 
-    if (isloggedin() and $USER->mnethostid != $CFG->mnet_localhost_id) {
+    if (isloggedin() and isset($CFG->mnet_localhost_id) and $USER->mnethostid != $CFG->mnet_localhost_id) {
         require_once($CFG->dirroot.'/mnet/peer.php');
         $mnet_peer = new mnet_peer();
         $mnet_peer->set_id($USER->mnethostid);
@@ -3039,7 +3052,7 @@ function current_theme() {
                 }
                 break;
             case 'site':
-                if (isloggedin() and $USER->mnethostid != $CFG->mnet_localhost_id && $mnet_peer->force_theme == 1 && $mnet_peer->theme != '') {
+                if (isloggedin() and isset($CFG->mnet_localhost_id) and $USER->mnethostid != $CFG->mnet_localhost_id && $mnet_peer->force_theme == 1 && $mnet_peer->theme != '') {
                     $theme = $mnet_peer->theme;
                 } else {
                     $theme = $CFG->theme;
@@ -4333,7 +4346,7 @@ function print_file_picture($path, $courseid=0, $height='', $width='', $link='',
  * @todo Finish documenting this function
  */
 function print_user_picture($user, $courseid, $picture=NULL, $size=0, $return=false, $link=true, $target='', $alttext=true) {
-    global $CFG, $HTTPSPAGEREQUIRED;
+    global $CFG;
 
     $needrec = false;
     // only touch the DB if we are missing data...
@@ -4388,11 +4401,6 @@ function print_user_picture($user, $courseid, $picture=NULL, $size=0, $return=fa
         $file = 'f2';
     }
     $class = "userpicture";
-    if (!empty($HTTPSPAGEREQUIRED)) {
-        $wwwroot = $CFG->httpswwwroot;
-    } else {
-        $wwwroot = $CFG->wwwroot;
-    }
 
     if (is_null($picture)) {
         $picture = $user->picture;
@@ -4414,7 +4422,7 @@ function print_user_picture($user, $courseid, $picture=NULL, $size=0, $return=fa
         }
     }
 
-    $output .= '<img class="'.$class.'" src="'.$src.'" alt="'.s($imagealt).'" />';
+    $output .= "<img class=\"$class\" src=\"$src\" height=\"$size\" width=\"$size\" alt=\"".s($imagealt).'"  />';
     if ($link) {
         $output .= '</a>';
     }
@@ -4534,7 +4542,7 @@ has_capability('moodle/course:viewhiddenuserfields', $context)) {
         $timemidnight = usergetmidnight(time());
         $output .= '<a href="'. $CFG->wwwroot .'/course/user.php?id='. $course->id .'&amp;user='. $user->id .'">'. $string->activity .'</a><br />';
     }
-    if (has_capability('moodle/role:assign', $context, NULL)) {  // Includes admins
+    if (has_capability('moodle/role:assign', $context) and get_user_roles($context, $user->id, false)) {  // I can unassing and user has some role
         $output .= '<a href="'. $CFG->wwwroot .'/course/unenrol.php?id='. $course->id .'&amp;user='. $user->id .'">'. $string->unenrol .'</a><br />';
     }
     if ($USER->id != $user->id && empty($USER->realuser) && has_capability('moodle/user:loginas', $context) &&
@@ -4596,16 +4604,14 @@ function print_group_picture($group, $courseid, $large=false, $return=false, $li
     }
     if ($large) {
         $file = 'f1';
-        $size = 100;
     } else {
         $file = 'f2';
-        $size = 35;
     }
     if ($group->picture) {  // Print custom group picture
         require_once($CFG->libdir.'/filelib.php');
         $grouppictureurl = get_file_url($group->id.'/'.$file.'.jpg', null, 'usergroup');
         $output .= '<img class="grouppicture" src="'.$grouppictureurl.'"'.
-            ' style="width:'.$size.'px;height:'.$size.'px;" alt="'.s(get_string('group').' '.$group->name).'" title="'.s($group->name).'"/>';
+            ' alt="'.s(get_string('group').' '.$group->name).'" title="'.s($group->name).'"/>';
     }
     if ($link or has_capability('moodle/site:accessallgroups', $context)) {
         $output .= '</a>';
@@ -4736,11 +4742,12 @@ function print_table($table, $return=false) {
     $output .= " cellpadding=\"$table->cellpadding\" cellspacing=\"$table->cellspacing\" class=\"$table->class boxalign$table->tablealign\" $tableid>\n";
 
     $countcols = 0;
-
+    
     if (!empty($table->head)) {
         $countcols = count($table->head);
         $output .= '<tr>';
-        $lastkey = end(array_keys($table->head));
+        $keys=array_keys($table->head);
+        $lastkey = end($keys);
         foreach ($table->head as $key => $heading) {
 
             if (!isset($size[$key])) {
@@ -4762,7 +4769,8 @@ function print_table($table, $return=false) {
 
     if (!empty($table->data)) {
         $oddeven = 1;
-        $lastrowkey = end(array_keys($table->data));
+        $keys=array_keys($table->data);
+        $lastrowkey = end($keys);
         foreach ($table->data as $key => $row) {
             $oddeven = $oddeven ? 0 : 1;
             if (!isset($table->rowclass[$key])) {
@@ -4775,7 +4783,8 @@ function print_table($table, $return=false) {
             if ($row == 'hr' and $countcols) {
                 $output .= '<td colspan="'. $countcols .'"><div class="tabledivider"></div></td>';
             } else {  /// it's a normal row of data
-            	$lastkey = end(array_keys($row));
+                $keys2=array_keys($row);
+                $lastkey = end($keys2);
                 foreach ($row as $key => $item) {
                     if (!isset($size[$key])) {
                         $size[$key] = '';
@@ -4787,9 +4796,9 @@ function print_table($table, $return=false) {
                         $wrap[$key] = '';
                     }
                     if ($key == $lastkey) {
-                    	$extraclass = ' lastcol';
+                      $extraclass = ' lastcol';
                     } else {
-                    	$extraclass = '';
+                      $extraclass = '';
                     }
                     $output .= '<td style="'. $align[$key].$size[$key].$wrap[$key] .'" class="cell c'.$key.$extraclass.'">'. $item .'</td>';
                 }
@@ -5679,19 +5688,23 @@ function print_scale_menu_helpbutton($courseid, $scale, $return=false) {
  *
  * @uses $SESSION
  * @uses $CFG
- * @param string $errorcode The name of the string from error.php to print
+ * @param string $errorcode The name of the string from error.php (or other specified file) to print
  * @param string $link The url where the user will be prompted to continue. If no url is provided the user will be directed to the site index page.
  * @param object $a Extra words and phrases that might be required in the error string
+ * @param array $extralocations An array of strings with other locations to look for string files
+ * @return does not return, terminates script
  */
-function print_error ($errorcode, $module='', $link='', $a=NULL) {
-
+function print_error($errorcode, $module='error', $link='', $a=NULL, $extralocations=NULL) {
     global $CFG, $SESSION, $THEME;
 
-    if (empty($module) || $module == 'moodle' || $module == 'core') {
+    if (empty($module) || $module === 'moodle' || $module === 'core') {
         $module = 'error';
-        $modulelink = 'moodle';
-    } else {
-        $modulelink = $module;
+    }
+
+    $message = get_string($errorcode, $module, $a, $extralocations);
+    if ($module === 'error' and strpos($message, '[[') === 0) {
+        //search in moodle file if error specified - needed for backwards compatibility
+        $message = get_string($errorcode, 'moodle', $a, $extralocations);
     }
 
     if (empty($link) and !defined('ADMIN_EXT_HEADER_PRINTED')) {
@@ -5711,12 +5724,16 @@ function print_error ($errorcode, $module='', $link='', $a=NULL) {
         $errordocroot = 'http://docs.moodle.org';
     }
 
-    $message = get_string($errorcode, $module, $a);
-
     if (defined('FULLME') && FULLME == 'cron') {
         // Errors in cron should be mtrace'd.
         mtrace($message);
         die;
+    }
+
+    if ($module === 'error') {
+        $modulelink = 'moodle';
+    } else {
+        $modulelink = $module;
     }
 
     $message = clean_text('<p class="errormessage">'.$message.'</p>'.
@@ -5760,11 +5777,11 @@ function print_error ($errorcode, $module='', $link='', $a=NULL) {
  * Default errorcode is 1.
  *
  * Very useful for perl-like error-handling:
- * 
+ *
  * do_somethting() or mdie("Something went wrong");
  *
  * @param string  $msg       Error message
- * @param integer $errorcode Error code to emit 
+ * @param integer $errorcode Error code to emit
  */
 function mdie($msg='', $errorcode=1) {
     trigger_error($msg);
@@ -5861,7 +5878,7 @@ function helpbutton ($page, $title, $module='moodle', $image=true, $linktext=fal
     if ( isset($text) && $text!='') {
       debugging('Warning: it\'s not recommended to use $text parameter in helpbutton ($page=' . $page . ', $module=' . $module . ') function', DEBUG_DEVELOPER);
     }
-    
+
     // fix for MDL-7734
     if (!empty($COURSE->lang)) {
         $forcelang = $COURSE->lang;
@@ -6600,11 +6617,12 @@ function page_id_and_class(&$getid, &$getclass) {
 function print_maintenance_message () {
     global $CFG, $SITE;
 
+    $CFG->pagepath = "index.php";
     print_header(strip_tags($SITE->fullname), $SITE->fullname, 'home');
-    print_simple_box_start('center');
+    print_box_start();
     print_heading(get_string('sitemaintenance', 'admin'));
     @include($CFG->dataroot.'/1/maintenance.html');
-    print_simple_box_end();
+    print_box_end();
     print_footer();
 }
 
@@ -6817,7 +6835,7 @@ function page_doc_link($text='', $iconpath='') {
  */
 function doc_link($path='', $text='', $iconpath='') {
     global $CFG;
-    
+
     if (empty($CFG->docroot)) {
         return '';
     }
@@ -6831,7 +6849,7 @@ function doc_link($path='', $text='', $iconpath='') {
 
     $str = '<a href="' .$CFG->docroot. '/' .$lang. '/' .$path. '"' .$target. '>';
 
-    if (empty($iconpath)) { 
+    if (empty($iconpath)) {
         $iconpath = $CFG->httpswwwroot . '/pix/docs.gif';
     }
 

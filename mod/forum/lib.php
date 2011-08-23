@@ -936,7 +936,7 @@ function forum_user_outline($course, $user, $mod, $forum) {
  *
  */
 function forum_user_complete($course, $user, $mod, $forum) {
-    global $CFG;
+    global $CFG,$USER;
 
     if ($posts = forum_get_user_posts($forum->id, $user->id)) {
 
@@ -945,18 +945,49 @@ function forum_user_complete($course, $user, $mod, $forum) {
         }
         $discussions = forum_get_user_involved_discussions($forum->id, $user->id);
 
-        foreach ($posts as $post) {
-            if (!isset($discussions[$forum->discussion])) {
-                continue;
+        // preload all user ratings for these discussions - one query only and minimal memory
+        $cm->cache->ratings = array();
+        $cm->cache->myratings = array();
+        if ($postratings = forum_get_all_user_ratings($user->id, $discussions)) {
+            foreach ($postratings as $pr) {
+                if (!isset($cm->cache->ratings[$pr->postid])) {
+                    $cm->cache->ratings[$pr->postid] = array();
+                }
+                $cm->cache->ratings[$pr->postid][$pr->id] = $pr->rating;
+
+                if ($pr->userid == $USER->id) {
+                    $cm->cache->myratings[$pr->postid] = $pr->rating;
+                }
             }
-            $discussion = $discussions[$forum->discussion];
-            forum_print_post($post, $discussion, $forum, $cm, $course, false, false, false, false);
+            unset($postratings);
         }
 
+        foreach ($posts as $post) {
+            if (!isset($discussions[$post->discussion])) {
+                continue;
+            }
+            $discussion = $discussions[$post->discussion];
+            
+            $ratings = null;
+
+            if ($forum->assessed) {
+                if ($scale = make_grades_menu($forum->scale)) {
+                    $ratings =new object();
+                    $ratings->scale = $scale;
+                    $ratings->assesstimestart = $forum->assesstimestart;
+                    $ratings->assesstimefinish = $forum->assesstimefinish;
+                    $ratings->allow = false;
+                }
+            }
+
+            forum_print_post($post, $discussion, $forum, $cm, $course, false, false, false, $ratings);
+
+        }
     } else {
         echo "<p>".get_string("noposts", "forum")."</p>";
     }
 }
+
 
 /**
  *
@@ -1796,6 +1827,41 @@ function forum_get_all_discussion_ratings($discussion) {
                                    {$CFG->prefix}forum_posts p
                              WHERE r.post = p.id AND p.discussion = $discussion->id
                              ORDER BY p.id ASC");
+}
+
+/**
+ * Returns a list of ratings for one specific user for all posts in discussion
+ * @global object $CFG
+ * @param object $discussions the discussions for which we return all ratings
+ * @param int $userid the user for who we return all ratings
+ * @return object
+ */
+function forum_get_all_user_ratings($userid, $discussions) {
+    global $CFG;
+
+
+    foreach ($discussions as $discussion) {
+     if (!isset($discussionsid)){
+         $discussionsid = $discussion->id;
+     }
+     else {
+         $discussionsid .= ",".$discussion->id;
+     }
+    }
+
+    $sql = "SELECT r.id, r.userid, p.id AS postid, r.rating
+                              FROM {$CFG->prefix}forum_ratings r,
+                                   {$CFG->prefix}forum_posts p
+                             WHERE r.post = p.id AND p.userid = $userid";
+    //postgres compability
+    if (!isset($discussionsid)) {
+       $sql .=" AND p.discussion IN (".$discussionsid.")";
+    }
+    $sql .=" ORDER BY p.id ASC";
+
+    return get_records_sql($sql);
+    
+
 }
 
 /**
@@ -3999,31 +4065,52 @@ function forum_unsubscribe($userid, $forumid) {
  * Given a new post, subscribes or unsubscribes as appropriate.
  * Returns some text which describes what happened.
  */
-function forum_post_subscription($post) {
+function forum_post_subscription($post, $forum) {
 
     global $USER;
-
-    $subscribed=forum_is_subscribed($USER->id, $post->forum);
-    if ((isset($post->subscribe) && $post->subscribe && $subscribed)
-        || (!$post->subscribe && !$subscribed)) {
+    
+    $action = '';
+    $subscribed = forum_is_subscribed($USER->id, $forum);
+    
+    if ($forum->forcesubscribe == FORUM_FORCESUBSCRIBE) { // database ignored
         return "";
-    }
 
-    if (!$forum = get_record("forum", "id", $post->forum)) {
-        return "";
+    } elseif (($forum->forcesubscribe == FORUM_DISALLOWSUBSCRIBE)
+        && !has_capability('moodle/course:manageactivities', $coursecontext, $USER->id)) {
+        if ($subscribed) {
+            $action = 'unsubscribe'; // sanity check, following MDL-14558
+        } else {
+            return "";
+        }
+
+    } else { // go with the user's choice
+        if (isset($post->subscribe)) {
+            // no change
+            if ((!empty($post->subscribe) && $subscribed)
+                || (empty($post->subscribe) && !$subscribed)) {
+                return "";
+
+            } elseif (!empty($post->subscribe) && !$subscribed) {
+                $action = 'subscribe';
+
+            } elseif (empty($post->subscribe) && $subscribed) {
+                $action = 'unsubscribe';
+            }
+        }
     }
 
     $info = new object();
     $info->name  = fullname($USER);
-    $info->forum = $forum->name;
+    $info->forum = format_string($forum->name);
 
-    if (!empty($post->subscribe)) {
-        forum_subscribe($USER->id, $post->forum);
-        return "<p>".get_string("nowsubscribed", "forum", $info)."</p>";
+    switch ($action) {
+        case 'subscribe':
+            forum_subscribe($USER->id, $post->forum);
+            return "<p>".get_string("nowsubscribed", "forum", $info)."</p>";
+        case 'unsubscribe':
+            forum_unsubscribe($USER->id, $post->forum);
+            return "<p>".get_string("nownotsubscribed", "forum", $info)."</p>";
     }
-
-    forum_unsubscribe($USER->id, $post->forum);
-    return "<p>".get_string("nownotsubscribed", "forum", $info)."</p>";
 }
 
 /**
@@ -4077,14 +4164,17 @@ function forum_get_subscribe_link($forum, $context, $messages = array(), $cantac
         $link = '';
 
         if ($fakelink) {
-            $link .= '<script type="text/javascript">';
-            $link .= '//<![CDATA['."\n";
-            $link .= 'document.getElementById("subscriptionlink").innerHTML = "<a title=\"' . $linktitle . '\" href=\"' . $CFG->wwwroot .
-               '/mod/forum/subscribe.php?id=' . $forum->id . $backtoindexlink.'\">' . $linktext . '<\/a>";';
-            $link .= '//]]>';
-            $link .= '</script>';
-            // use <noscript> to print button in case javascript is not enabled
-            $link .= '<noscript>';
+            $link .= <<<EOD
+<script type="text/javascript">
+//<![CDATA[
+var subs_link = document.getElementById("subscriptionlink");
+if(subs_link){
+    subs_link.innerHTML = "<a title=\"$linktitle\" href='$CFG->wwwroot/mod/forum/subscribe.php?id={$forum->id}{$backtoindexlink}'>$linktext<\/a>";
+}
+//]]>
+</script>
+<noscript>
+EOD;
         }
         $options ['id'] = $forum->id;
         $link .= print_single_button($CFG->wwwroot . '/mod/forum/subscribe.php',
@@ -4122,11 +4212,11 @@ function forum_get_tracking_link($forum, $messages=array(), $fakelink=true) {
 
     if (forum_tp_is_tracked($forum)) {
         $linktitle = $strnotrackforum;
-        $linktext = $strtrackforum;
+        $linktext = $strnotrackforum;
     } else {
         $linktitle = $strtrackforum;
-        $linktext = $strnotrackforum;
-    }
+        $linktext = $strtrackforum;
+    } 
 
     $link = '';
     if ($fakelink) {
@@ -4285,7 +4375,7 @@ function forum_user_can_post($forum, $discussion, $user=NULL, $cm=NULL, $course=
 
     if (!isset($discussion->groupid)) {
         debugging('incorrect discussion parameter', DEBUG_DEVELOPER);
-        return false; 
+        return false;
     }
 
     if (!$cm) {
@@ -4342,7 +4432,7 @@ function forum_user_can_post($forum, $discussion, $user=NULL, $cm=NULL, $course=
             return false;
         }
         return groups_is_member($discussion->groupid);
-    } 
+    }
 }
 
 
@@ -4832,7 +4922,9 @@ function forum_print_discussion($course, $cm, $forum, $discussion, $post, $mode,
                 unset($postratings);
             }
         }
+
     }
+
 
 
     $post->forum = $forum->id;   // Add the forum id to the post object, later used by forum_print_post
@@ -6688,6 +6780,13 @@ function forum_get_open_modes() {
     return array ('2' => get_string('openmode2', 'forum'),
                   '1' => get_string('openmode1', 'forum'),
                   '0' => get_string('openmode0', 'forum') );
+}
+
+/**
+ * Returns all other caps used in module
+ */
+function forum_get_extra_capabilities() {
+    return array('moodle/site:accessallgroups', 'moodle/site:viewfullnames', 'moodle/site:trustcontent');
 }
 
 ?>

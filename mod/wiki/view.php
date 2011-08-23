@@ -13,12 +13,12 @@
     $ewiki_action = optional_param('ewiki_action', '', PARAM_ALPHA);     // Action on Wiki-Page
     $id           = optional_param('id', 0, PARAM_INT);                  // Course Module ID, or
     $wid          = optional_param('wid', 0, PARAM_INT);                 // Wiki ID
-    $page         = optional_param('page', false);       // Wiki Page Name
-    $q            = optional_param('q',"");              // Search Context
+    $page         = optional_param('page', false);                       // Wiki Page Name
+    $q            = optional_param('q',"", PARAM_PATH);                  // Search Context
     $userid       = optional_param('userid', 0, PARAM_INT);              // User wiki.
     $groupid      = optional_param('groupid', 0, PARAM_INT);             // Group wiki.
-    $canceledit   = optional_param('canceledit','', PARAM_ALPHA);          // Editing has been cancelled
-    $cacheme      = optional_param('allowcache', 1, PARAM_INT);   // Set this to 0 to try and disable page caching.
+    $canceledit   = optional_param('canceledit','', PARAM_ALPHA);        // Editing has been cancelled
+    $cacheme      = optional_param('allowcache', 1, PARAM_INT);          // Set this to 0 to try and disable page caching.
     
     // Only want to add edit log entries if we have made some changes ie submitted a form
     $editsave = optional_param('thankyou', '');
@@ -275,8 +275,14 @@
 
     $strwikis = get_string("modulenameplural", "wiki");
     $strwiki  = get_string("modulename", "wiki");
-    
-    $navigation = build_navigation('', $cm);
+
+    $navlinks = array();
+/// Add page name if not main page
+    if ($ewiki_title != $wiki->name) {
+        $navlinks[] = array('name' => format_string($ewiki_title), 'link' => '', 'type' => 'title');
+    }
+
+    $navigation = build_navigation($navlinks, $cm);
     print_header_simple($ewiki_title?$ewiki_title:format_string($wiki->name), "", $navigation,
                 "", "", $cacheme, update_module_button($cm->id, $course->id, $strwiki),
                 navmenu($course, $cm));
@@ -369,7 +375,7 @@
         $currenttab = '';
         foreach ($tabs as $tab) {
             $tabname = get_string("tab$tab", 'wiki');
-            $row[] = new tabobject($tabname, $ewbase.'&amp;page='.$tab.'/'.$ewiki_id, $tabname);
+            $row[] = new tabobject($tabname, $ewbase.'&amp;page='.$tab.'/'.s($ewiki_id), $tabname);
             if ($ewiki_action == "$tab" or in_array($page, $specialpages)) {
                 $currenttab = $tabname;
             }

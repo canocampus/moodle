@@ -39,6 +39,7 @@ $string['continue'] = 'Continua';
 $string['ctyperecommended'] = 'Es recomana instal·lar l\'extensió de PHP ctype a fi de millorar el rendiment del lloc, especialment si teniu usuaris que treballen amb idiomes no occidentals.';
 $string['ctyperequired'] = 'A hores d\'ara Moodle requereix l\'extensió de PHP ctype, a fi de millorar el rendiment del lloc i oferir compatibilitat amb diferents idiomes.';
 $string['curlrecommended'] = 'Es recomana instal·lar la biblioteca opcional Curl a fi d\'habilitar la funcionalitat de Moodle en Xarxa.';
+$string['curlrequired'] = 'L\'extensió de PHP cURL és ara necessària per a comunicar-se amb repositoris Moodle.';
 $string['customcheck'] = 'Altres comprovacions';
 $string['database'] = 'Base de dades';
 $string['databasecreationsettingshead'] = 'Ara cal configurar els paràmetres de la base de dades on s\'emmagatzemaran la majoria de dades de Moodle. L\'instal·lador crearà automàticament aquesta base de dades amb els paràmetres que especifiqueu aquí.';
@@ -221,7 +222,7 @@ $string['password'] = 'Contrasenya';
 $string['pgsqlextensionisnotpresentinphp'] = 'El PHP no s\'ha configurat correctament amb l\'extensió PGSQL de manera que pugui comunicar-se amb PostgreSQL. Reviseu el fitxer php.ini o recompileu el PHP.';
 $string['php50restricted'] = 'PHP 5.0 té alguns problemes coneguts. Actualitzeu-vos si us plau a 5.1.x o torneu a 4.3.x o 4.4.x';
 $string['phpversion'] = 'Versió PHP';
-$string['phpversionerror'] = 'La versió del PHP ha de ser com a mínim la 4.1.0';
+$string['phpversionerror'] = 'La versió del PHP ha de ser com a mínim la 4.1.0'; // ORPHANED
 $string['phpversionhelp'] = '<p>Moodle necessita la versió de PHP 4.1.0 o posterior.</p>
 <p>A hores d\'ara esteu utilitzant la versió $a.</p>
 <p>Us caldrà actualitzar el PHP o traslladar Moodle a un ordinador amb una versió de PHP més recent.</p>';

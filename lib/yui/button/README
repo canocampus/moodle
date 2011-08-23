@@ -1,4 +1,168 @@
-*** Version 2.3.0 ***
+*** version 2.6.0 ***
+
+Fixed the following bugs:
+-------------------------
+
++ Clicking on the option region of a Button of "type" split will fire the "option" event, but not
+  "mousedown," "mouseup," "click," or "dblclick".
+
++ Buttons of type "radio" and "checkbox" will not override a value provided for the title attribute.
+
++ Returning false in an inline "submit" event handler for a form will now prevent the form
+  from being submitted when the form contains Button instances.
+  
++ Pressing the enter key to submit a form containing Button instances will no longer 
+  trigger a beep sound in Internet Explorer.
+
++ The Button widget no longer logs errors when strict error reporting is enabled in FireFox.
+
++ Button instances are now automatically clicked when their corresponding <label> is clicked.
+
++ The name and value of selected MenuItems in submenus of a Button's Menu are now part of their
+  parent form's data when the form is submitted.
+
++ For Button's of type "menu" and "split" created using an existing <SELECT> element: The name and 
+  value of the pre-selected MenuItem in a Button's Menu are now part of their parent form's data 
+  when the form is submitted.
+	
++ The "appendTo" event now correctly fires when the "container" attribute is set to a 
+  node reference.
+
++ Simple forms with two fields: a Button of type "submit" and a text field will no longer 
+  be submitted twice when the enter key is pressed.
+
++ Submitting a form by pressing the enter key will now result in a Button's "click" event 
+  handlers getting called.
+
++ Buttons of type "menu" and "split" now consistently display their Menus in Opera.
+
++ Button no longer logs a warning when a Button is created without an id.
+  
+
+Added the following features:
+-----------------------------
+
++ Added a new "menumaxheight" attribute used to set the "maxheight" configuration property of a 
+  Button's Menu.
+
++ Added a new "menuminscrollheight" attribute used to set the "minscrollheight" configuration 
+  property of a Button's Menu.
+
++ Added a "menualignment" attribute attribute used to control how a Menu is aligned to its 
+  corresponding Button.
+
++ Added a "yui-split-button-hoveroption" CSS class that is applied when the user hovers the mouse 
+  over the "option" section of a split button.
+
+
+Changes:
+--------
+
++ Removed the rounded corners for IE 6 Quirks Mode and Strict Mode and IE 7 Quirks Mode.
+
++ Changed the keyboard shortcut used to display the Menu for Button's of type "split" to the down
+  arrow key.
+
++ Passing a DOM element reference to the "container" attribute will no longer result in the Button 
+  being appended to the container immediately.  Use the "appendTo" event to listen for when 
+  the Button will be appended to the element specified as its container.  To append a Button to
+  an element in the DOM immediately, use the "appendTo" method rather than the "container" 
+  attribute.
+
+
+*** Version 2.5.2 ***
+
+Fixed the following bugs:
+-------------------------
+
++ Button instances no longer flicker in Firefox 3 when their "label" attributed is updated.
+
++ Scrolled Menus of Buttons whose type attribute is set to "menu" or "split" no longer appear 
+  on top of their corresponding Button instance.
+
++ The keyboard shortcut responsible for triggering the display of the Menu for Button instances of
+  type "split" will no longer trigger the display of the browser's default context menu in Opera.
+
+
+
+*** Version 2.5.1 ***
+
++ No changes.
+
+
+
+*** Version 2.5.0 ***
+
++ Fixed issue where returning false inside the scope of a listener for attribute "before" 
+  events (i.e "beforeCheckedChange") would not cancel the attribute's default setter.
+
+
+
+*** Version 2.4.1 ***
+
++ No changes.
+
+
+
+*** Version 2.4.0 ***
+
+Added the following features:
+-----------------------------
+
++ Added a static method "YAHOO.widget.Button.getButton" that returns a Button 
+  instance with the specified HTML element id.
+
+
+Fixed the following bugs:
+-------------------------
+
++ Removed the ".yui-skin-sam" CSS class name from style rules in the core 
+  stylesheet so that it is now truly skin agnostic.
+
++ Updated the default text for tooltips for Buttons of type "radio" so that 
+  they offer the correct instructional text.
+
++ Menus with grouped YAHOO.widget.MenuItem instances will now highlight 
+  correctly when used with Button.
+
++ Buttons of type "link" now have the same default height as other Button
+  types in Internet Explorer.
+
++ Buttons of various types now line up correctly on the same line.
+
++ Menu is now truly an optional dependancy of Button.
+
++ Menus now render with the correct width when the "yui-skin-sam" CSS class 
+  name is applied to an element other than the <BODY>.
+
+
+
+*** Version 2.3.1 ***
+
+Fixed the following bugs:
+-------------------------
++ Purged the old 2.2.2 Button stylesheet and related image assets that was 
+  mistakenly included in the 2.3.0 build.
+
++ Fixed an issue in Gecko where changing a Button instance's "label" attribute
+  after the Button had been created would not result in the Button redrawing at
+  a width to fit its content.
+  
++ Fixed an issue where the singleton keypress event handler
+  (YAHOO.widget.Button.onFormKeyPress) registered for forms containing
+  Button instances of type "submit" was not removed from the form once all of 
+  its child Button instances are destroyed.
+
++ Submitting a form by clicking on a MenuItem of a SplitButton's or MenuButton's
+  Menu will no longer result in a JavaScript error.
+  
++ Modified how element tag names are compared to support XHTML applications.
+
++ Added code to remove the CSS class names representing the "hover," "focus," 
+  and "active" states when a Button instance is disabled.
+
+
+*** Version 2.3 ***
 
 Added the following features:
 -----------------------------

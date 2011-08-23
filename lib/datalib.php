@@ -1235,7 +1235,7 @@ function get_categories($parent='none', $sort=NULL, $shallow=true) {
     if( $rs = get_recordset_sql($sql) ){
         while ($cat = rs_fetch_next_record($rs)) {
             $cat = make_context_subobj($cat);
-            if ($cat->visible || has_capability('moodle/course:create',$cat->context)) {
+            if ($cat->visible || has_capability('moodle/category:visibility',$cat->context)) {
                 $categories[$cat->id] = $cat;
             }
         }
@@ -1461,7 +1461,7 @@ function get_my_remotecourses($userid=0) {
         $userid = $USER->id;
     }
 
-    $sql = "SELECT c.remoteid, c.shortname, c.fullname,
+    $sql = "SELECT c.id, c.remoteid, c.shortname, c.fullname,
                    c.hostid, c.summary, c.cat_name,
                    h.name AS hostname
             FROM   {$CFG->prefix}mnet_enrol_course c

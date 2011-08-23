@@ -19,13 +19,11 @@ function scorm_get_toc($user,$scorm,$liststyle,$currentorg='',$scoid='',$mode='n
     //
     // Get the current organization infos
     //
-    $organizationsql = '';
     if (!empty($currentorg)) {
         if (($organizationtitle = get_field('scorm_scoes','title','scorm',$scorm->id,'identifier',$currentorg)) != '') {
             $result->toc .= "\t<li>$organizationtitle</li>\n";
             $tocmenus[] = $organizationtitle;
         }
-        $organizationsql = "AND organization='$currentorg'";
     }
     //
     // If not specified retrieve the last attempt number
@@ -34,25 +32,19 @@ function scorm_get_toc($user,$scorm,$liststyle,$currentorg='',$scoid='',$mode='n
         $attempt = scorm_get_last_attempt($scorm->id, $user->id);
     }
     $result->attemptleft = $scorm->maxattempt - $attempt;
-    if ($scoes = get_records_select('scorm_scoes',"scorm='$scorm->id' $organizationsql order by id ASC")){
-        // drop keys so that we can access array sequentially
-        $scoes = array_values($scoes); 
+    if ($scoes = scorm_get_scoes($scorm->id, $currentorg)){
         //
         // Retrieve user tracking data for each learning object
         // 
     
         $usertracks = array();
-        $optionaldatas = array();
         foreach ($scoes as $sco) {
             if (!empty($sco->launch)) {
-                if ($usertrack=scorm_get_tracks($sco->id,$user->id,$attempt)) {
+                if ($usertrack = scorm_get_tracks($sco->id,$user->id,$attempt)) {
                     if ($usertrack->status == '') {
                         $usertrack->status = 'notattempted';
                     }
                     $usertracks[$sco->identifier] = $usertrack;
-                }
-                if ($optionaldata = scorm_get_sco($sco->id, SCO_DATA)) {
-                    $optionaldatas[$sco->identifier] = $optionaldata;
                 }
             }
         }
@@ -63,14 +55,11 @@ function scorm_get_toc($user,$scorm,$liststyle,$currentorg='',$scoid='',$mode='n
         $nextid = 0;
         $findnext = false;
         $parents[$level]='/';
-        foreach ($scoes as $pos=>$sco) {
+        foreach ($scoes as $pos => $sco) {
             $isvisible = false;
             $sco->title = stripslashes($sco->title);
-            if (isset($optionaldatas[$sco->identifier])) {
-                if (!isset($optionaldatas[$sco->identifier]->isvisible) || 
-                   (isset($optionaldatas[$sco->identifier]->isvisible) && ($optionaldatas[$sco->identifier]->isvisible == 'true'))) {
-                    $isvisible = true;
-                }
+            if (!isset($sco->isvisible) || (isset($sco->isvisible) && ($sco->isvisible == 'true'))) {
+                $isvisible = true;
             }
             if ($parents[$level]!=$sco->parent) {
                 if ($newlevel = array_search($sco->parent,$parents)) {
@@ -105,11 +94,8 @@ function scorm_get_toc($user,$scorm,$liststyle,$currentorg='',$scoid='',$mode='n
                 $nextsco = false;
             }
             $nextisvisible = false;
-            if (($nextsco !== false) && (isset($optionaldatas[$nextsco->identifier]))) {
-                if (!isset($optionaldatas[$nextsco->identifier]->isvisible) || 
-                   (isset($optionaldatas[$nextsco->identifier]->isvisible) && ($optionaldatas[$nextsco->identifier]->isvisible == 'true'))) {
-                    $nextisvisible = true;
-                }
+            if (!isset($nextsco->isvisible) || (isset($nextsco->isvisible) && ($nextsco->isvisible == 'true'))) {
+                $nextisvisible = true;
             }
             if ($nextisvisible && ($nextsco !== false) && ($sco->parent != $nextsco->parent) && 
                (($level==0) || (($level>0) && ($nextsco->parent == $sco->identifier)))) {
@@ -154,7 +140,9 @@ function scorm_get_toc($user,$scorm,$liststyle,$currentorg='',$scoid='',$mode='n
                         }
                         $strsuspended = get_string('suspended','scorm');
                         if (isset($usertrack->{'cmi.core.exit'}) && ($usertrack->{'cmi.core.exit'} == 'suspend')) {
-                            $statusicon = '<img src="'.$scormpixdir.'/suspend.gif" alt="'.$strstatus.' - '.$strsuspended.'" title="'.$strstatus.' - '.$strsuspended.'" />';
+                            if($usertrack->status !='completed') {
+                                $statusicon = '<img src="'.$scormpixdir.'/suspend.gif" alt="'.$strstatus.' - '.$strsuspended.'" title="'.$strstatus.' - '.$strsuspended.'" />';
+                            }
                         }
                     } else {
                         if ($play && empty($scoid)) {
@@ -172,8 +160,8 @@ function scorm_get_toc($user,$scorm,$liststyle,$currentorg='',$scoid='',$mode='n
                         $startbold = '<b>';
                         $endbold = '</b>';
                         $findnext = true;
-                        $shownext = isset($optionaldatas[$sco->identifier]->next) ? $optionaldatas[$sco->identifier]->next : 0;
-                        $showprev = isset($optionaldatas[$sco->identifier]->prev) ? $optionaldatas[$sco->identifier]->prev : 0;
+                        $shownext = isset($sco->next) ? $sco->next : 0;
+                        $showprev = isset($sco->prev) ? $sco->prev : 0;
                     }
                 
                     if (($nextid == 0) && (scorm_count_launchable($scorm->id,$currentorg) > 1) && ($nextsco!==false) && (!$findnext)) {
@@ -225,19 +213,16 @@ function scorm_get_toc($user,$scorm,$liststyle,$currentorg='',$scoid='',$mode='n
           <script type="text/javascript">
           //<![CDATA[
               function expandCollide(which,list,item) {
-                  var nn=document.ids?true:false
-                  var w3c=document.getElementById?true:false
-                  var beg=nn?"document.ids.":w3c?"document.getElementById(\'":"document.all.";
-                  var mid=w3c?"\').style":".style";
-
+                  var el = document.ids ? document.ids[list] : document.getElementById ? document.getElementById(list) : document.all[list];
                   which = which.substring(0,(which.length));
-                  if (eval(beg+list+mid+".display") != "none") {
-                      document.getElementById(which).src = "'.$scormpixdir.'/plus.gif";
-                      eval(beg+list+mid+".display=\'none\';");
+                  var el2 = document.ids ? document.ids[which] : document.getElementById ? document.getElementById(which) : document.all[which];
+                  if (el.style.display != "none") {
+                      el2.src = "'.$scormpixdir.'/plus.gif";
+                      el.style.display=\'none\';
                       new cookie("hide:SCORMitem" + item, 1, 356, "/").set();
                   } else {
-                      document.getElementById(which).src = "'.$scormpixdir.'/minus.gif";
-                      eval(beg+list+mid+".display=\'block\';");
+                      el2.src = "'.$scormpixdir.'/minus.gif";
+                      el.style.display=\'block\';
                       new cookie("hide:SCORMitem" + item, 1, -1, "/").set();
                   }
               }

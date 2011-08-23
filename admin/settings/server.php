@@ -20,7 +20,7 @@ $ADMIN->add('server', $temp, 0);
 
 // "email" settingpage
 $temp = new admin_settingpage('mail', get_string('mail','admin'));
-$temp->add(new admin_setting_configtext('smtphosts', get_string('smtphosts', 'admin'), get_string('configsmtphosts', 'admin'), '', PARAM_HOST));
+$temp->add(new admin_setting_configtext('smtphosts', get_string('smtphosts', 'admin'), get_string('configsmtphosts', 'admin'), '', PARAM_RAW));
 $temp->add(new admin_setting_configtext('smtpuser', get_string('smtpuser', 'admin'), get_string('configsmtpuser', 'admin'), '', PARAM_NOTAGS));
 $temp->add(new admin_setting_configpasswordunmask('smtppass', get_string('smtppass', 'admin'), get_string('configsmtpuser', 'admin'), ''));
 $temp->add(new admin_setting_configtext('smtpmaxbulk', get_string('smtpmaxbulk', 'admin'), get_string('configsmtpmaxbulk', 'admin'), 1, PARAM_INT));
@@ -123,7 +123,7 @@ $temp->add(new admin_setting_configselect('statsfirstrun', get_string('statsfirs
                                                                                                                                                            60*60*24*140 => get_string('nummonths','moodle',5),
                                                                                                                                                            60*60*24*168 => get_string('nummonths','moodle',6),
                                                                                                                                                            'all' => get_string('all') )));
-$temp->add(new admin_setting_configselect('statsmaxruntime', get_string('statsmaxruntime', 'admin'), get_string('configstatsmaxruntime2', 'admin'), 0, array(0 => get_string('untilcomplete'),
+$temp->add(new admin_setting_configselect('statsmaxruntime', get_string('statsmaxruntime', 'admin'), get_string('configstatsmaxruntime3', 'admin'), 0, array(0 => get_string('untilcomplete'),
                                                                                                                                                             60*30 => '10 '.get_string('minutes'),
                                                                                                                                                             60*30 => '30 '.get_string('minutes'),
                                                                                                                                                             60*60 => '1 '.get_string('hour'),
@@ -134,6 +134,7 @@ $temp->add(new admin_setting_configselect('statsmaxruntime', get_string('statsma
                                                                                                                                                             60*60*6 => '6 '.get_string('hours'),
                                                                                                                                                             60*60*7 => '7 '.get_string('hours'),
                                                                                                                                                             60*60*8 => '8 '.get_string('hours') )));
+$temp->add(new admin_setting_configtext('statsruntimedays', get_string('statsruntimedays', 'admin'), get_string('configstatsruntimedays', 'admin'), 31, PARAM_INT));
 $temp->add(new admin_setting_configtime('statsruntimestarthour', 'statsruntimestartminute', get_string('statsruntimestart', 'admin'), get_string('configstatsruntimestart', 'admin'), array('h' => 0, 'm' => 0)));
 $temp->add(new admin_setting_configtext('statsuserthreshold', get_string('statsuserthreshold', 'admin'), get_string('configstatsuserthreshold', 'admin'), 0, PARAM_INT));
 
@@ -146,6 +147,13 @@ $ADMIN->add('server', $temp);
 $temp = new admin_settingpage('http', get_string('http', 'admin'));
 $temp->add(new admin_setting_configtext('framename', get_string('framename', 'admin'), get_string('configframename', 'admin'), '_top', PARAM_ALPHAEXT));
 $temp->add(new admin_setting_configcheckbox('slasharguments', get_string('slasharguments', 'admin'), get_string('configslasharguments', 'admin'), 1));
+$temp->add(new admin_setting_heading('reverseproxy', get_string('reverseproxy', 'admin'), '', ''));
+$options = array(
+    0 => 'HTTP_CLIENT_IP, HTTP_X_FORWARDED_FOR, REMOTE_ADDR',
+    GETREMOTEADDR_SKIP_HTTP_CLIENT_IP => 'HTTP_X_FORWARDED_FOR, REMOTE_ADDR',
+    GETREMOTEADDR_SKIP_HTTP_X_FORWARDED_FOR => 'HTTP_CLIENT, REMOTE_ADDR',
+    GETREMOTEADDR_SKIP_HTTP_X_FORWARDED_FOR|GETREMOTEADDR_SKIP_HTTP_CLIENT_IP => 'REMOTE_ADDR');
+$temp->add(new admin_setting_configselect('getremoteaddrconf', get_string('getremoteaddrconf', 'admin'), get_string('configgetremoteaddrconf', 'admin'), 0, $options));
 $temp->add(new admin_setting_heading('webproxy', get_string('webproxy', 'admin'), get_string('webproxyinfo', 'admin')));
 $temp->add(new admin_setting_configtext('proxyhost', get_string('proxyhost', 'admin'), get_string('configproxyhost', 'admin'), '', PARAM_HOST));
 $temp->add(new admin_setting_configtext('proxyport', get_string('proxyport', 'admin'), get_string('configproxyport', 'admin'), 0, PARAM_INT));

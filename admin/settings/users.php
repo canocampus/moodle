@@ -6,7 +6,9 @@ if ($hassiteconfig
  or has_capability('moodle/site:uploadusers', $systemcontext)
  or has_capability('moodle/user:create', $systemcontext)
  or has_capability('moodle/user:update', $systemcontext)
- or has_capability('moodle/user:delete', $systemcontext)) { // speedup for non-admins, add all caps used on this page
+ or has_capability('moodle/user:delete', $systemcontext)
+ or has_capability('moodle/role:manage', $systemcontext)
+ or has_capability('moodle/role:assign', $systemcontext)) { // speedup for non-admins, add all caps used on this page
 
 
     $ADMIN->add('users', new admin_category('authsettings', get_string('authentication','admin')));
@@ -25,6 +27,7 @@ if ($hassiteconfig
                                                 get_string('authinstructions', 'auth'), ''));
     $temp->add(new admin_setting_configtext('allowemailaddresses', get_string('allowemailaddresses', 'admin'), get_string('configallowemailaddresses', 'admin'), '', PARAM_NOTAGS));
     $temp->add(new admin_setting_configtext('denyemailaddresses', get_string('denyemailaddresses', 'admin'), get_string('configdenyemailaddresses', 'admin'), '', PARAM_NOTAGS));
+    $temp->add(new admin_setting_configcheckbox('verifychangedemail', get_string('verifychangedemail', 'admin'), get_string('configverifychangedemail', 'admin'), 1));
     
     $temp->add(new admin_setting_configtext('recaptchapublickey', get_string('recaptchapublickey', 'admin'), get_string('configrecaptchapublickey', 'admin'), '', PARAM_NOTAGS));
     $temp->add(new admin_setting_configtext('recaptchaprivatekey', get_string('recaptchaprivatekey', 'admin'), get_string('configrecaptchaprivatekey', 'admin'), '', PARAM_NOTAGS));
@@ -78,8 +81,8 @@ if ($hassiteconfig
 
     // stuff under the "roles" subcategory
     $ADMIN->add('users', new admin_category('roles', get_string('permissions', 'role')));
-    $ADMIN->add('roles', new admin_externalpage('defineroles', get_string('defineroles', 'role'), "$CFG->wwwroot/$CFG->admin/roles/manage.php"));
-    $ADMIN->add('roles', new admin_externalpage('assignroles', get_string('assignglobalroles', 'role'), "$CFG->wwwroot/$CFG->admin/roles/assign.php?contextid=".$systemcontext->id));
+    $ADMIN->add('roles', new admin_externalpage('defineroles', get_string('defineroles', 'role'), "$CFG->wwwroot/$CFG->admin/roles/manage.php", 'moodle/role:manage'));
+    $ADMIN->add('roles', new admin_externalpage('assignroles', get_string('assignglobalroles', 'role'), "$CFG->wwwroot/$CFG->admin/roles/assign.php?contextid=".$systemcontext->id, 'moodle/role:assign'));
 
 
     // "userpolicies" settingpage

@@ -78,6 +78,14 @@
         <meta http-equiv="content-type" content="text/html; charset=utf-8" />
         <script type="text/javascript">
         //<![CDATA[
+        function safari_refresh() {
+            self.location.href= '<?php echo $refreshurl;?>';
+        }
+        var issafari = false;
+        if(window.devicePixelRatio){
+            issafari = true;
+            setTimeout('safari_refresh()', <?php echo $CFG->chat_refresh_room*1000;?>);
+        }
         if (parent.msg.document.getElementById("msgStarted") == null) {
             parent.msg.document.close();
             parent.msg.document.open("text/html","replace");
@@ -193,7 +201,14 @@
             }
         }
 
-        print 'parent.msg.scroll(1,5000000);' . "\n\n";
+        print <<<EOD
+        if(parent.input){
+            var autoscroll = parent.input.document.getElementById('auto');
+            if(parent.msg && autoscroll && autoscroll.checked){
+                parent.msg.scroll(1,5000000);
+            }
+        }
+EOD;
         print "//]]>\n";
         print '</script>' . "\n\n";
         if ($beep) {

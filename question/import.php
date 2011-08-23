@@ -19,7 +19,6 @@
 
    // get display strings
     $txt = new stdClass();
-    $txt->importerror = get_string('importerror','quiz');
     $txt->importquestions = get_string("importquestions", "quiz");
 
     list($catid, $catcontext) = explode(',', $pagevars['cat']);
@@ -92,6 +91,7 @@
         // or one from the filesarea.
         if (!empty($form->choosefile)) {
             $importfile = "{$CFG->dataroot}/{$COURSE->id}/{$form->choosefile}";
+            $realfilename = $form->choosefile;
             if (file_exists($importfile)) {
                 $fileisgood = true;
             } else {
@@ -99,6 +99,7 @@
             }
         } else {
             // must be upload file
+            $realfilename = $import_form->get_importfile_realname();
             if (!$importfile = $import_form->get_importfile_name()) {
                 print_error('uploadproblem', 'moodle');
             }else {
@@ -124,6 +125,7 @@
             $qformat->setContexts($contexts->having_one_edit_tab_cap('import'));
             $qformat->setCourse($COURSE);
             $qformat->setFilename($importfile);
+            $qformat->setRealfilename($realfilename);
             $qformat->setMatchgrades($form->matchgrades);
             $qformat->setCatfromfile(!empty($form->catfromfile));
             $qformat->setContextfromfile(!empty($form->contextfromfile));
@@ -131,17 +133,17 @@
 
             // Do anything before that we need to
             if (! $qformat->importpreprocess()) {
-                error($txt->importerror, $thispageurl->out());
+                print_error('importerror', 'quiz', $thispageurl->out());
             }
 
             // Process the uploaded file
             if (! $qformat->importprocess()) {
-                error($txt->importerror, $thispageurl->out());
+                print_error('importerror', 'quiz', $thispageurl->out());
             }
 
             // In case anything needs to be done after
             if (! $qformat->importpostprocess()) {
-                error($txt->importerror, $thispageurl->out());
+                print_error('importerror', 'quiz', $thispageurl->out());
             }
 
             echo "<hr />";
