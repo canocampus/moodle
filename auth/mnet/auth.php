@@ -208,7 +208,7 @@ class auth_plugin_mnet extends auth_plugin_base {
             $mnet_session->confirm_timeout = time() + $this->config->rpc_negotiation_timeout;
             $mnet_session->expires = time() + (integer)ini_get('session.gc_maxlifetime');
             $mnet_session->session_id = session_id();
-            if (! $mnet_session->id = insert_record('mnet_session', addslashes_object($mnet_session))) {
+            if (! $mnet_session->id = insert_record('mnet_session', addslashes_recursive($mnet_session))) {
                 print_error('databaseerror', 'mnet');
             }
         } else {
@@ -217,7 +217,7 @@ class auth_plugin_mnet extends auth_plugin_base {
             $mnet_session->confirm_timeout = time() + $this->config->rpc_negotiation_timeout;
             $mnet_session->expires = time() + (integer)ini_get('session.gc_maxlifetime');
             $mnet_session->session_id = session_id();
-            if (false == update_record('mnet_session', addslashes_object($mnet_session))) {
+            if (false == update_record('mnet_session', addslashes_recursive($mnet_session))) {
                 print_error('databaseerror', 'mnet');
             }
         }
@@ -294,7 +294,7 @@ class auth_plugin_mnet extends auth_plugin_base {
                 print_error('nolocaluser', 'mnet');
             }
             $remoteuser->mnethostid = $remotehost->id;
-            if (! insert_record('user', addslashes_object($remoteuser))) {
+            if (! insert_record('user', addslashes_recursive($remoteuser))) {
                 print_error('databaseerror', 'mnet');
             }
             $firsttime = true;
@@ -368,7 +368,7 @@ class auth_plugin_mnet extends auth_plugin_base {
 
         $localuser->mnethostid = $remotepeer->id;
 
-        $bool = update_record('user', addslashes_object($localuser));
+        $bool = update_record('user', addslashes_recursive($localuser));
         if (!$bool) {
             // TODO: Jonathan to clean up mess
             // Actually, this should never happen (modulo race conditions) - ML
@@ -391,12 +391,12 @@ class auth_plugin_mnet extends auth_plugin_base {
             $mnet_session->confirm_timeout = time();
             $mnet_session->expires = time() + (integer)$session_gc_maxlifetime;
             $mnet_session->session_id = session_id();
-            if (! $mnet_session->id = insert_record('mnet_session', addslashes_object($mnet_session))) {
+            if (! $mnet_session->id = insert_record('mnet_session', addslashes_recursive($mnet_session))) {
                 print_error('databaseerror', 'mnet');
             }
         } else {
             $mnet_session->expires = time() + (integer)$session_gc_maxlifetime;
-            update_record('mnet_session', addslashes_object($mnet_session));
+            update_record('mnet_session', addslashes_recursive($mnet_session));
         }
 
         if (!$firsttime) {
@@ -540,7 +540,7 @@ class auth_plugin_mnet extends auth_plugin_base {
             // First up - do we have a record for this course?
             if (!array_key_exists($course['remoteid'], $currentcourses)) {
                 // No record - we must create it
-                $course['id']  =  insert_record('mnet_enrol_course', addslashes_object((object)$course));
+                $course['id']  =  insert_record('mnet_enrol_course', addslashes_recursive((object)$course));
                 $currentcourse = (object)$course;
             } else {
                 // Pointer to current course:
@@ -558,7 +558,7 @@ class auth_plugin_mnet extends auth_plugin_base {
                 }
 
                 if ($saveflag) {
-                    update_record('mnet_enrol_course', addslashes_object($currentcourse));
+                    update_record('mnet_enrol_course', addslashes_recursive($currentcourse));
                 }
 
                 if (isset($currentcourse->assignmentid) && is_numeric($currentcourse->assignmentid)) {
@@ -581,7 +581,7 @@ class auth_plugin_mnet extends auth_plugin_base {
                 $assignObj->hostid    = (int)$MNET_REMOTE_CLIENT->id;
                 $assignObj->courseid  = $course['id'];
                 $assignObj->rolename  = $course['defaultrolename'];
-                $assignObj->id = insert_record('mnet_enrol_assignments', addslashes_object($assignObj));
+                $assignObj->id = insert_record('mnet_enrol_assignments', addslashes_recursive($assignObj));
             }
         }
 
@@ -772,76 +772,76 @@ class auth_plugin_mnet extends auth_plugin_base {
                           join("\n", $mnet_request->error));
                 break;
             }
+            $mnethostlogssql = '
+            SELECT
+                mhostlogs.remoteid, mhostlogs.time, mhostlogs.userid, mhostlogs.ip,
+                mhostlogs.course, mhostlogs.module, mhostlogs.cmid, mhostlogs.action,
+                mhostlogs.url, mhostlogs.info, mhostlogs.username, c.fullname as coursename,
+                c.modinfo
+            FROM
+                (
+                    SELECT
+                        l.id as remoteid, l.time, l.userid, l.ip, l.course, l.module, l.cmid,
+                        l.action, l.url, l.info, u.username
+                    FROM
+                        ' . $CFG->prefix . 'user u
+                        INNER JOIN ' . $CFG->prefix . 'log l on l.userid = u.id
+                    WHERE
+                        u.mnethostid = ' . $mnethostid . '
+                        AND l.id > ' . $mnet_request->response['last log id'] . '
+                    ORDER BY remoteid ASC
+                    LIMIT 500
+                ) mhostlogs
+                INNER JOIN ' . $CFG->prefix . 'course c on c.id = mhostlogs.course
+            ORDER by mhostlogs.remoteid ASC';
 
-            $query = "SELECT
-                          l.id as remoteid,
-                          l.time,
-                          l.userid,
-                          l.ip,
-                          l.course,
-                          l.module,
-                          l.cmid,
-                          l.action,
-                          l.url,
-                          l.info,
-                          c.fullname as coursename,
-                          c.modinfo as modinfo,
-                          u.username
-                      FROM
-                          {$CFG->prefix}user u,
-                          {$CFG->prefix}log l,
-                          {$CFG->prefix}course c
-                      WHERE
-                          l.userid = u.id AND
-                          u.mnethostid = '$mnethostid' AND
-                          l.id > '".$mnet_request->response['last log id']."' AND
-                          c.id = l.course
-                      ORDER BY
-                          remoteid ASC";
+            $mnethostlogs = get_records_sql($mnethostlogssql);
 
-            $results = get_records_sql($query);
+            if ($mnethostlogs == false) {
+                continue;
+            }
 
-            if (false == $results) continue;
+            $processedlogs = array();
 
-            $param = array();
-
-            foreach($results as $result) {
-                if (!empty($result->modinfo) && !empty($result->cmid)) {
-                    $modinfo = unserialize($result->modinfo);
-                    unset($result->modinfo);
+            foreach($mnethostlogs as $hostlog) {
+                // Extract the name of the relevant module instance from the
+                // course modinfo if possible.
+                if (!empty($hostlog->modinfo) && !empty($hostlog->cmid)) {
+                    $modinfo = unserialize($hostlog->modinfo);
+                    unset($hostlog->modinfo);
                     $modulearray = array();
                     foreach($modinfo as $module) {
                         $modulearray[$module->cm] = urldecode($module->name);
                     }
-                    $result->resource_name = $modulearray[$result->cmid];
+                    $hostlog->resource_name = $modulearray[$hostlog->cmid];
                 } else {
-                    $result->resource_name = '';
+                    $hostlog->resource_name = '';
                 }
 
-                $param[] = array (
-                                    'remoteid'      => $result->remoteid,
-                                    'time'          => $result->time,
-                                    'userid'        => $result->userid,
-                                    'ip'            => $result->ip,
-                                    'course'        => $result->course,
-                                    'coursename'    => $result->coursename,
-                                    'module'        => $result->module,
-                                    'cmid'          => $result->cmid,
-                                    'action'        => $result->action,
-                                    'url'           => $result->url,
-                                    'info'          => $result->info,
-                                    'resource_name' => $result->resource_name,
-                                    'username'      => $result->username
+                $processedlogs[] = array (
+                                    'remoteid'      => $hostlog->remoteid,
+                                    'time'          => $hostlog->time,
+                                    'userid'        => $hostlog->userid,
+                                    'ip'            => $hostlog->ip,
+                                    'course'        => $hostlog->course,
+                                    'coursename'    => $hostlog->coursename,
+                                    'module'        => $hostlog->module,
+                                    'cmid'          => $hostlog->cmid,
+                                    'action'        => $hostlog->action,
+                                    'url'           => $hostlog->url,
+                                    'info'          => $hostlog->info,
+                                    'resource_name' => $hostlog->resource_name,
+                                    'username'      => $hostlog->username
                                  );
             }
 
-            unset($result);
+            unset($hostlog);
 
             $mnet_request = new mnet_xmlrpc_client();
             $mnet_request->set_method('auth/mnet/auth.php/refresh_log');
 
             // set $token and $useragent parameters
-            $mnet_request->add_param($param);
+            $mnet_request->add_param($processedlogs);
 
             if ($mnet_request->send($mnet_peer) === true) {
                 if ($mnet_request->response['code'] > 0) {
@@ -877,7 +877,7 @@ class auth_plugin_mnet extends auth_plugin_base {
             if (isset($useridarray[$logEntryObj->username])) {
                 $logEntryObj->userid = $useridarray[$logEntryObj->username];
             } else {
-                $logEntryObj->userid = get_field('user','id','username',$logEntryObj->username);
+                $logEntryObj->userid = get_field('user','id','username',$logEntryObj->username,'mnethostid',(int)$logEntryObj->hostid);
                 if ($logEntryObj->userid == false) {
                     $logEntryObj->userid = 0;
                 }
@@ -886,10 +886,12 @@ class auth_plugin_mnet extends auth_plugin_base {
 
             unset($logEntryObj->username);
 
-            $insertok = insert_record('mnet_log', addslashes_object($logEntryObj), false);
+            $logEntryObj = $this->trim_logline($logEntryObj);
+            $insertok = insert_record('mnet_log', addslashes_recursive($logEntryObj), false);
 
             if ($insertok) {
                 $MNET_REMOTE_CLIENT->last_log_id = $logEntryObj->remoteid;
+                $MNET_REMOTE_CLIENT->updateparams->last_log_id = $logEntryObj->remoteid;
             } else {
                 $returnString .= 'Record with id '.$logEntryObj->remoteid." failed to insert.\n";
             }
@@ -1351,6 +1353,25 @@ class auth_plugin_mnet extends auth_plugin_base {
             $redirect = $host->wwwroot.'/';
         }
     }
+
+    /**
+     * Trims a log line from mnet peer to limit each part to a length which can be stored in our DB
+     *
+     * @param object $logline The log information to be trimmed
+     * @return object The passed logline object trimmed to not exceed storable limits
+     */
+    function trim_logline ($logline) {
+        $limits = array('ip' => 15, 'coursename' => 40, 'module' => 20, 'action' => 40,
+                        'url' => 255);
+        foreach ($limits as $property => $limit) {
+            if (isset($logline->$property)) {
+                $logline->$property = substr($logline->$property, 0, $limit);
+            }
+        }
+
+        return $logline;
+    }
+
 
 }
 

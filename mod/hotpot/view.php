@@ -58,7 +58,7 @@
         if (!hotpot_is_visible($cm)) {
             $error = get_string("activityiscurrentlyhidden");
         // check network address
-        } else if ($hotpot->subnet && !address_in_subnet($_SERVER['REMOTE_ADDR'], $hotpot->subnet)) {
+        } else if ($hotpot->subnet && !address_in_subnet(getremoteaddr(), $hotpot->subnet)) {
             $error = get_string("subneterror", "quiz");
         // check number of attempts
         } else if ($hotpot->attempts && $hotpot->attempts <= count_records_select('hotpot_attempts', 'hotpot='.$hotpot->id.' AND userid='.$USER->id, 'COUNT(DISTINCT clickreportid)')) {
@@ -71,13 +71,13 @@
             $boxwidth = 500;
             if (trim(strip_tags($hotpot->summary))) {
                 print_simple_box_start($boxalign, $boxwidth);
-                print '<div align="center">'.format_text($hotpot->summary)."</div>\n";
+                print '<div class="mdl-align">'.format_text($hotpot->summary)."</div>\n";
                 print_simple_box_end();
                 print "<br />\n";
             }
             print '<form id="passwordform" method="post" action="view.php?id='.$cm->id.'">'."\n";
             print_simple_box_start($boxalign, $boxwidth);
-            print '<div align="center">';
+            print '<div class="mdl-align">';
             print get_string('requirepasswordmessage', 'quiz').'<br /><br />';
             print '<b>'.get_string('password').':</b> ';
             print '<input name="hppassword" type="password" value="" /> ';

@@ -780,12 +780,20 @@ function displaydir ($wdir) {
                 $fileurl  = rawurlencode($wdir."/".$dir);
                 $filesafe = rawurlencode($dir);
                 $filesize = display_size(get_directory_size("$fullpath/$dir"));
-                $filedate = userdate(filemtime($filename), "%d %b %Y, %I:%M %p");
-                print_cell("center", "<input type=\"checkbox\" name=\"file$count\" value=\"$fileurl\" />", 'checkbox');
+                $filedate = userdate(filemtime($filename), get_string("strftimedatetime"));
+                if ($wdir.$dir === '/moddata') {
+                    print_cell();
+                } else {
+                    print_cell("center", "<input type=\"checkbox\" name=\"file$count\" value=\"$fileurl\" />", 'checkbox');
+                }
                 print_cell("left", "<a href=\"index.php?id=$id&amp;wdir=$fileurl&amp;choose=$choose\"><img src=\"$CFG->pixpath/f/folder.gif\" class=\"icon\" alt=\"$strfolder\" />&nbsp;".htmlspecialchars($dir)."</a>", 'name');
                 print_cell("right", $filesize, 'size');
                 print_cell("right", $filedate, 'date');
-                print_cell("right", "<a href=\"index.php?id=$id&amp;wdir=$wdir&amp;file=$filesafe&amp;action=rename&amp;choose=$choose\">$strrename</a>", 'commands');
+                if ($wdir.$dir === '/moddata') {
+                    print_cell();
+                } else { 
+                    print_cell("right", "<a href=\"index.php?id=$id&amp;wdir=$wdir&amp;file=$filesafe&amp;action=rename&amp;choose=$choose\">$strrename</a>", 'commands');
+                }
             }
 
             echo "</tr>";
@@ -804,7 +812,7 @@ function displaydir ($wdir) {
             $fileurl     = trim($wdir, "/")."/$file";
             $filesafe    = rawurlencode($file);
             $fileurlsafe = rawurlencode($fileurl);
-            $filedate    = userdate(filemtime($filename), "%d %b %Y, %I:%M %p");
+            $filedate    = userdate(filemtime($filename), get_string("strftimedatetime"));
 
             $selectfile = trim($fileurl, "/");
 

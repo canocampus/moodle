@@ -89,6 +89,7 @@ $temp->add(new admin_setting_configselect('sessiontimeout', get_string('sessiont
                                                                                                                                                       300 => get_string('numminutes', '', 5))));
 $temp->add(new admin_setting_configtext('sessioncookie', get_string('sessioncookie', 'admin'), get_string('configsessioncookie', 'admin'), '', PARAM_ALPHANUM));
 $temp->add(new admin_setting_configtext('sessioncookiepath', get_string('sessioncookiepath', 'admin'), get_string('configsessioncookiepath', 'admin'), '/', PARAM_LOCALURL));
+$temp->add(new admin_setting_configtext('sessioncookiedomain', get_string('sessioncookiedomain', 'admin'), get_string('configsessioncookiedomain', 'admin'), '', PARAM_TEXT, 50));
 $ADMIN->add('server', $temp, 50);
 
 
@@ -211,7 +212,10 @@ $temp->add(new admin_setting_configselect('loglifetime', get_string('loglifetime
                                                                                                                                                 120 => get_string('numdays', '', 120),
                                                                                                                                                 90 => get_string('numdays', '', 90),
                                                                                                                                                 60 => get_string('numdays', '', 60),
-                                                                                                                                                35 => get_string('numdays', '', 35))));
+                                                                                                                                                35 => get_string('numdays', '', 35),
+                                                                                                                                                10 => get_string('numdays', '', 10),
+                                                                                                                                                5 => get_string('numdays', '', 5),
+                                                                                                                                                2 => get_string('numdays', '', 2))));
 
 
 $temp->add(new admin_setting_configcheckbox('disablegradehistory', get_string('disablegradehistory', 'grades'),
@@ -238,6 +242,16 @@ $ADMIN->add('server', new admin_externalpage('phpinfo', get_string('phpinfo'), "
 
 // "performance" settingpage
 $temp = new admin_settingpage('performance', get_string('performance', 'admin'));
+
+$temp->add(new admin_setting_configselect('extramemorylimit', get_string('extramemorylimit', 'admin'),
+                                          get_string('configextramemorylimit', 'admin'), '128M',
+                                          // if this option is set to 0, default 128M will be used
+                                          array( '64M' => '64M',
+                                                 '128M' => '128M',
+                                                 '256M' => '256M',
+                                                 '512M' => '512M',
+                                                 '1024M' => '1024M'
+                                             )));
 $temp->add(new admin_setting_special_selectsetup('cachetype', get_string('cachetype', 'admin'),
                                           get_string('configcachetype', 'admin'), '',
                                           array( '' => get_string('none'),
@@ -261,8 +275,14 @@ $temp->add(new admin_setting_configselect('memcachedpconn', get_string('memcache
                                                  '1' => get_string('yes'))));
 $ADMIN->add('server', $temp);
 
-if (file_exists("$CFG->dirroot/$CFG->admin/mysql/frame.php")) {
-    $ADMIN->add('server', new admin_externalpage('database', get_string('managedatabase'), "$CFG->wwwroot/$CFG->admin/mysql/frame.php"));
+if ($CFG->dbfamily === 'mysql') {
+    if (file_exists("$CFG->dirroot/$CFG->admin/mysql/frame.php")) {
+        $ADMIN->add('server', new admin_externalpage('database', get_string('managedatabase'), "$CFG->wwwroot/$CFG->admin/mysql/frame.php"));
+    }
+} else if ($CFG->dbfamily === 'postgres') {
+    if (file_exists("$CFG->dirroot/$CFG->admin/pgsql/frame.php")) {
+        $ADMIN->add('server', new admin_externalpage('database', get_string('managedatabase'), "$CFG->wwwroot/$CFG->admin/pgsql/frame.php"));
+    }
 }
 
 } // end of speedup

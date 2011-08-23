@@ -40,7 +40,7 @@
     }
     if (!empty($CFG->showcrondebugging)) {
         $CFG->debug = DEBUG_DEVELOPER;
-        $CFG->displaydebug = true;
+        $CFG->debugdisplay = true;
     }
 
 /// extra safety
@@ -245,7 +245,7 @@
             while ($assign = rs_fetch_next_record($rs)) {
                 if ($context = get_context_instance(CONTEXT_COURSE, $assign->courseid)) {
                     if (role_unassign(0, $assign->userid, 0, $context->id)) {
-                        mtrace("Deleted assignment for user $assign->userid from course $assign->courseid");
+                        mtrace("removing user $assign->userid from course $assign->courseid as they have not accessed the course for over $CFG->longtimenosee days");
                     }
                 }
             }
@@ -425,6 +425,23 @@
         }
     }
 
+/// Run the auth cron, if any
+/// before enrolments because it might add users that will be needed in enrol plugins
+    $auths = get_enabled_auth_plugins();
+
+    mtrace("Running auth crons if required...");
+    foreach ($auths as $auth) {
+        $authplugin = get_auth_plugin($auth);
+        if (method_exists($authplugin, 'cron')) {
+            mtrace("Running cron for auth/$auth...");
+            $authplugin->cron();
+            if (!empty($authplugin->log)) {
+                mtrace($authplugin->log);
+            }
+        }
+        unset($authplugin);
+    }
+
 /// Run the enrolment cron, if any
     if (!($plugins = explode(',', $CFG->enrol_plugins_enabled))) {
         $plugins = array($CFG->enrol);
@@ -439,22 +456,6 @@
             mtrace($enrol->log);
         }
         unset($enrol);
-    }
-
-/// Run the auth cron, if any
-    $auths = get_enabled_auth_plugins();
-
-    mtrace("Running auth crons if required...");
-    foreach ($auths as $auth) {
-        $authplugin = get_auth_plugin($auth);
-        if (method_exists($authplugin, 'cron')) {
-            mtrace("Running cron for auth/$auth...");
-            $authplugin->cron();
-            if (!empty($authplugin->log)) {
-                mtrace($authplugin->log);
-            }
-        }
-        unset($authplugin);
     }
 
     if (!empty($CFG->enablestats) and empty($CFG->disablestatsprocessing)) {

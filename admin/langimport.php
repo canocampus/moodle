@@ -11,6 +11,13 @@
 
     admin_externalpage_setup('langimport');
 
+    if (!empty($CFG->skiplangupgrade)) {
+        admin_externalpage_print_header();
+        print_box(get_string('langimportdisabled', 'admin'));
+        print_footer();
+        die;
+    }
+
     $mode          = optional_param('mode', 0, PARAM_INT);     //phase
     $pack          = optional_param('pack', array(), PARAM_FILE);   //pack to install
     $displaylang   = $pack;
@@ -43,8 +50,8 @@
 
             if (confirm_sesskey() and !empty($pack)) {
                 set_time_limit(0);
-                @mkdir ($CFG->dataroot.'/temp/');    //make it in case it's a fresh install, it might not be there
-                @mkdir ($CFG->dataroot.'/lang/');
+                @mkdir ($CFG->dataroot.'/temp/', $CFG->directorypermissions);    //make it in case it's a fresh install, it might not be there
+                @mkdir ($CFG->dataroot.'/lang/', $CFG->directorypermissions);
 
                 if (is_array($pack)) {
                     $packs = $pack;
@@ -160,8 +167,8 @@
                 }
             }
 
-            @mkdir ($CFG->dataroot.'/temp/');
-            @mkdir ($CFG->dataroot.'/lang/');
+            @mkdir ($CFG->dataroot.'/temp/', $CFG->directorypermissions);
+            @mkdir ($CFG->dataroot.'/lang/', $CFG->directorypermissions);
             foreach ($packs as $pack){    //for each of the remaining in the list, we
                 if ($pack == 'en_utf8') {    // no update for en_utf8
                     continue;

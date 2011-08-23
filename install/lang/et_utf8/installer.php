@@ -12,6 +12,7 @@
 $string['admindirerror']='Valitud administreerimiskataloog on vale';
 $string['admindirname']='Administreerimiskataloog';
 $string['admindirsettinghead']='Kataloogi admin seadistamine ...';
+$string['bypassed']='Läbitud';
 $string['cannotcreatelangdir']='Ei saa luua lang kataloogi';
 $string['cannotcreatetempdir']='Ei saa luua temp kataloogi';
 $string['cannotdownloadcomponents']='Ei saa alla tõmmata komponente.';
@@ -83,8 +84,10 @@ $string['databasesettingssub_postgres7']='<b>Tüüp:</b> PostgreSQL<br />
 	<b>Nimi:</b> andmebaasi nimi, näiteks moodle<br />
 	<b>Kasutaja:</b> Sinu andmebaasi konto kasutajatunnus<br />
 	<b>Tabelite prefiks:</b> prefiks kasutamaks tabelite nimedes (kohustuslik)';
+$string['databasesettingswillbecreated']='<b>Märkus:</b> Installeerija püüab luua andmebaasi automaatselt, kui seda ei eksisteeri.';
 $string['dataroot']='Andmete kataloog';
 $string['datarooterror']='Sinu määratud andmete kataloogi ei suudetud leida ega luua. Paranda tee või loo ise käsitsi see kataloog.';
+$string['datarootpublicerror']='Sinu määratud andmete kataloog on otse ligipääsetav veebi kaudu. Sa pead valima mingi muu kataloogi.';
 $string['dbconnectionerror']='Me ei suutnud sinu määratud andmebaasi ühendada. Palun kontrolli oma andmebaasi seadistust.';
 $string['dbcreationerror']='Andmebaasi loomise viga. Ei suudetud luua andmebaasi nime olemasolevate seadistustega.';
 $string['dbhost']='Hosti server';
@@ -156,8 +159,8 @@ See lubab Moodle\'il ise mälu limiiti määrata.</li>
 $string['missingrequiredfield']='Mõned nõutud väljad on puudu';
 $string['moodledocslink']='Moodle manuaalid käesoleva lehe kohta';
 $string['mssql']='SQL*Server (mssql)';
-$string['mssql_n']='SQL*Server UTF-8 toetusega (mssql_n)';
 $string['mssqlextensionisnotpresentinphp']='PHP laiendus MSSQL ei ole korralikult seadistatud, mistõttu ei saa ühenduda SQL*Server\'iga. Palun kontrolli oma php.ini faili või kompileeri PHP uuesti.';
+$string['mssql_n']='SQL*Server UTF-8 toetusega (mssql_n)';
 $string['mysql']='MySQL (mysql)';
 $string['mysql416bypassed']='Kuid, kui Sinu õpikeskkond kasutab AINULT iso-8859-1 (latin) tähestikuga keelt, Sa võid jätkata praegu installeeritud MySQL versiooniga 4.1.12 (või uuem).';
 $string['mysql416required']='MySQL 4.1.16 on minimaalne versioon, mis on nõutud Moodle 1.6 poolt, et tagada kõik andmed saaksid konverteeritud UTF-8 kodeeringusse.';
@@ -166,8 +169,8 @@ $string['name']='Nimi';
 $string['next']='Järgmine';
 $string['oci8po']='Oracle (oci8po)';
 $string['ociextensionisnotpresentinphp']='PHP laiendus OCI8 ei ole korralikult seadistatud, mistõttu ei saa ühenduda Oracle\'ga. Palun kontrolli oma php.ini faili või kompileeri PHP uuesti.';
-$string['odbc_mssql']='SQL*Server üle ODBC (odbc_mssql)';
 $string['odbcextensionisnotpresentinphp']='PHP laiendus ODBC ei ole korralikult seadistatud, mistõttu ei saa ühenduda SQL*Server\'iga. Palun kontrolli oma php.ini faili või kompileeri PHP uuesti.';
+$string['odbc_mssql']='SQL*Server üle ODBC (odbc_mssql)';
 $string['ok']='OK';
 $string['opensslrecommended']='Fakultatiivse OpenSSL teegi installeerimine on väga soovitatav, millega võimaldatakse Moodle võrgunduse funktsionaalsus.';
 $string['pass']='Korras';
@@ -175,7 +178,7 @@ $string['password']='Salasõna';
 $string['pgsqlextensionisnotpresentinphp']='PHP laiendus PGSQL ei ole korralikult seadistatud, mistõttu ei saa ühenduda PostgreSQL\'iga. Palun kontrolli oma php.ini faili või kompileeri PHP uuesti.';
 $string['php50restricted']='PHP 5.0.x omab mitmeid probleeme. Palun uuenda 5.1.x või lase tagasi 4.3.x or 4.4.x PHP versioonile';
 $string['phpversion']='PHP versioon';
-$string['phpversionerror']='PHP versioon peab olema vähemalt 4.1.0';
+$string['phpversionerror']='PHP versioon peab olema vähemalt 4.1.0'; // ORPHANED
 $string['phpversionhelp']='<p>Moodle vajab vähemalt PHP versiooni 4.1.0</p>
 <p>Sinu jooksev versioon on $a</p>
 <p>Sa pead oma PHP-d uuendama või kolima hosti, kus on uuem PHP versioon!</p>';

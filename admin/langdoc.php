@@ -112,7 +112,7 @@
             for ($a=0; $a < count($pathparts)-1 ; $a++) {
                 $checkpath .= "/".$pathparts[$a];
                 if(!file_exists($checkpath)){
-                     if(!mkdir($checkpath)){
+                     if(!mkdir($checkpath, $CFG->directorypermissions)){
                          echo ("Cannot create directory: $checkpath");
                      }    
                 }    
@@ -186,7 +186,7 @@ $langdir/$currentfile")."</font></p>";
             if ($preview_url) {
                 link_to_popup_window($preview_url, 'popup', get_string('preview'));
             }
-            echo '<div align="center"><input type="submit" value="'.get_string('savechanges').': lang/'.$currentlang.'/'.$currentfile.'" /></div>';
+            echo '<div class="mdl-align"><input type="submit" value="'.get_string('savechanges').': lang/'.$currentlang.'/'.$currentfile.'" /></div>';
             echo '</form>';
         }
 

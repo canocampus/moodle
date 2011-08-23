@@ -54,7 +54,7 @@ class DataSearchDocument extends SearchDocument {
         $data->database = $record['dataid'];
         
         // construct the parent class
-        parent::__construct($doc, $data, $course_id, $record['groupid'], $record['userid'], PATH_FOR_SEARCH_TYPE_DATA);
+        parent::__construct($doc, $data, $course_id, $record['groupid'], $record['userid'], 'mod/'.SEARCH_TYPE_DATA);
     } 
 }
 
@@ -85,7 +85,7 @@ class DataCommentSearchDocument extends SearchDocument {
         $data->database = $comment['dataid'];
         
         // construct the parent class
-        parent::__construct($doc, $data, $course_id, $comment['groupid'], $comment['userid'], PATH_FOR_SEARCH_TYPE_DATA);
+        parent::__construct($doc, $data, $course_id, $comment['groupid'], $comment['userid'], 'mod/'.SEARCH_TYPE_DATA);
     } 
 }
 
@@ -109,10 +109,11 @@ function data_make_link($database_id, $record_id) {
 * @uses CFG
 * @return an array of objects representing the data records.
 */
-function data_get_records($database_id, $typematch = '*') {
+function data_get_records($database_id, $typematch = '*', $recordid = 0) {
     global $CFG;
     
     $fieldset = get_records('data_fields', 'dataid', $database_id);
+    $uniquerecordclause = ($recordid > 0) ? " AND c.recordid = $recordid " : '' ;
     $query = "
         SELECT
            c.*
@@ -122,6 +123,7 @@ function data_get_records($database_id, $typematch = '*') {
         WHERE
             c.recordid = r.id AND
             r.dataid = {$database_id} 
+            $uniquerecordclause
         ORDER BY 
             c.fieldid
     ";
@@ -203,17 +205,16 @@ function data_get_content_for_index(&$database) {
             unset($records_content[$aRecordId]['_first']);
     
             // concatenates all other texts
+            $content = '';
             foreach($records_content[$aRecordId] as $aField){
                 $content = @$content.' '.$aField;
             }
-            if (strlen($content) > 0) {
-                unset($recordMetaData);
-                $recordMetaData = get_record('data_records', 'id', $aRecordId);
-                $recordMetaData->title = $first;
-                $recordTitles[$aRecordId] = $first;
-                $recordMetaData->content = $content;
-                $documents[] = new DataSearchDocument(get_object_vars($recordMetaData), $database->course, $context->id);
-            } 
+            unset($recordMetaData);
+            $recordMetaData = get_record('data_records', 'id', $aRecordId);
+            $recordMetaData->title = $first;
+            $recordTitles[$aRecordId] = $first;
+            $recordMetaData->content = $content;
+            $documents[] = new DataSearchDocument(get_object_vars($recordMetaData), $database->course, $context->id);
         } 
     }
 
@@ -221,7 +222,7 @@ function data_get_content_for_index(&$database) {
     $records_comments = data_get_comments($database->id);
     if ($records_comments){
         foreach($records_comments as $aComment){
-            $aComment->title = $recordsTitle[$aComment->recordid];
+            $aComment->title = $recordsTitles[$aComment->recordid];
             $documents[] = new DataCommentSearchDocument(get_object_vars($aComment), $database->course, $context->id);
         }
     }
@@ -244,23 +245,28 @@ function data_single_document($id, $itemtype) {
         $coursemodule = get_field('modules', 'id', 'name', 'data');
         $cm = get_record('course_modules', 'course', $record_course, 'module', $coursemodule, 'instance', $recordMetaData->dataid);
         $context = get_context_instance(CONTEXT_MODULE, $cm->id);
+        // get text fields ids in this data (computable fields)
         // compute text
-        $recordData = get_records_select('data_content', "recordid = $id AND type = 'text'", 'recordid');
-        $accumulator = '';
+        $recordData = data_get_records($recordMetaData->dataid, 'text', $id);
         if ($recordData){
-            $first = $recordData[0];
-            if (count($recordData) > 1){
-                $others = array_splice($recordData, 0, 1);
-                foreach($others as $aDatum){
-                    $accumulator .= $data->content.' '.$data->content1.' '.$data->content2.' '.$data->content3.' '.$data->content4.' ';
-                }
+            $dataArray = array_values($recordData);
+            $record_content = $dataArray[0]; // We cannot have more than one record here
+
+            // extract title as first record in order
+            $first = $record_content['_first'];
+            unset($record_content['_first']);
+    
+            // concatenates all other texts
+            $content = '';
+            foreach($record_content as $aField){
+                $content = @$content.' '.$aField;
             }
+            unset($recordMetaData);
+            $recordMetaData = get_record('data_records', 'id', $aRecordId);
+            $recordMetaData->title = $first;
+            $recordMetaData->content = $content;
+            return new DataSearchDocument(get_object_vars($recordMetaData), $record_course, $context->id);
         }
-        // add extra fields
-        $recordMetaData->title = $first;
-        $recordMetaData->content = $accumulator;
-        // make document
-        $documents[] = new DataSearchDocument(get_object_vars($recordMetaData), $record_course, $context->id);
     } elseif($itemtype == 'comment') {
         // get main records
         $comment = get_record('data_comments', 'id', $id);
@@ -275,9 +281,10 @@ function data_single_document($id, $itemtype) {
         $comment->dataid = $record->dataid;
         $comment->groupid = $record->groupid;
         // make document
-        $documents[] = new DataCommentSearchDocument(get_object_vars($comment), $record_course, $context->id);
+        return new DataCommentSearchDocument(get_object_vars($comment), $record_course, $context->id);
     } else {
        mtrace('Error : bad or missing item type');
+       return NULL;
     }
 }
 
@@ -348,7 +355,6 @@ function data_check_text_access($path, $itemtype, $this_id, $user, $group_id, $c
     
     //group consistency check : checks the following situations about groups
     // trap if user is not same group and groups are separated
-    $current_group = get_current_group($course->id);
     $course = get_record('course', 'id', $data->course);
     if ((groupmode($course, $cm) == SEPARATEGROUPS) && !ismember($group_id) && !has_capability('moodle/site:accessallgroups', $context)){ 
         if (!empty($CFG->search_access_debug)) echo "search reject : separated group owned resource ";
@@ -368,7 +374,7 @@ function data_check_text_access($path, $itemtype, $this_id, $user, $group_id, $c
     // trap if unapproved and has not approval capabilities
     // TODO : report a potential capability lack of : mod/data:approve
     $approval = get_field('data_records', 'approved', 'id', $record->id);
-    if (!$approval && !isteacher($data->course) && !has_capability('mod/data:manageentries', $context)){
+    if (!$approval && !has_capability('mod/data:manageentries', $context)){
         if (!empty($CFG->search_access_debug)) echo "search reject : unapproved resource ";
         return false;
     }
@@ -377,7 +383,7 @@ function data_check_text_access($path, $itemtype, $this_id, $user, $group_id, $c
     // trap if too few records
     // TODO : report a potential capability lack of : mod/data:viewhiddenentries
     $recordsAmount = count_records('data_records', 'dataid', $data->id);
-    if ($data->requiredentriestoview > $recordsAmount && !isteacher($data->course) && !has_capability('mod/data:manageentries', $context)) {
+    if ($data->requiredentriestoview > $recordsAmount && !has_capability('mod/data:manageentries', $context)) {
         if (!empty($CFG->search_access_debug)) echo "search reject : not enough records to view ";
         return false;
     }
@@ -387,12 +393,12 @@ function data_check_text_access($path, $itemtype, $this_id, $user, $group_id, $c
     // TODO : report a potential capability lack of : mod/data:viewhiddenentries
     $now = usertime(time());
     if ($data->timeviewfrom > 0)
-        if ($now < $data->timeviewfrom && !isteacher($data->course) && !has_capability('mod/data:manageentries', $context)) {
+        if ($now < $data->timeviewfrom && !has_capability('mod/data:manageentries', $context)) {
             if (!empty($CFG->search_access_debug)) echo "search reject : still not open activity ";
             return false;
         }
     if ($data->timeviewto > 0)
-        if ($now > $data->timeviewto && !isteacher($data->course) && !has_capability('mod/data:manageentries', $context)) {
+        if ($now > $data->timeviewto && !has_capability('mod/data:manageentries', $context)) {
             if (!empty($CFG->search_access_debug)) echo "search reject : closed activity ";
             return false;
         }
@@ -405,7 +411,12 @@ function data_check_text_access($path, $itemtype, $this_id, $user, $group_id, $c
 * @param string $title
 */
 function data_link_post_processing($title){
-    return mb_convert_encoding($title, 'UTF-8', 'auto');
+    global $CFG;
+    
+    if ($CFG->block_search_utf8dir){
+        return mb_convert_encoding($title, 'UTF-8', 'auto');
+    }
+    return mb_convert_encoding($title, 'auto', 'UTF-8');
 }
 
 ?>
