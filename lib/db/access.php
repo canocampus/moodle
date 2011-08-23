@@ -180,6 +180,16 @@ $moodle_capabilities = array(
         )
     ),
 
+    'moodle/restore:rolldates' => array(
+
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_COURSE,
+        'legacy' => array(
+            'coursecreator' => CAP_ALLOW,
+            'admin' => CAP_ALLOW
+        )
+    ),
+
     'moodle/site:manageblocks' => array(
 
         'riskbitmask' => RISK_SPAM | RISK_XSS,
@@ -651,6 +661,30 @@ $moodle_capabilities = array(
 
     'moodle/course:changeidnumber' => array(
 
+        'riskbitmask' => RISK_XSS,
+
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_COURSE,
+        'legacy' => array(
+            'editingteacher' => CAP_ALLOW,
+            'admin' => CAP_ALLOW
+        ),
+        'clonepermissionsfrom' => 'moodle/course:update'
+    ),
+
+    'moodle/course:changecategory' => array(
+        'riskbitmask' => RISK_XSS,
+
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_COURSE,
+        'legacy' => array(
+            'editingteacher' => CAP_ALLOW,
+            'admin' => CAP_ALLOW
+        ),
+        'clonepermissionsfrom' => 'moodle/course:update'
+    ),
+
+    'moodle/course:changesummary' => array(
         'riskbitmask' => RISK_XSS,
 
         'captype' => 'write',

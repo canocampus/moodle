@@ -59,6 +59,12 @@ function make_log_url($module, $url) {
         case 'notes':
             $url = "/notes/$url";
             break;
+        case 'tag':
+            $url = "/tag/$url";
+            break;
+        case 'role':
+            $url = '/'.$url;
+            break;
         default:
             $url = "/mod/$module/$url";
             break;
@@ -1183,7 +1189,9 @@ function &get_fast_modinfo(&$course, $userid=0) {
 
     // Ensure cache does not use too much RAM
     if (count($cache) > MAX_MODINFO_CACHE_SIZE) {
-        array_shift($cache);
+        reset($cache);
+        $key = key($cache);
+        unset($cache[$key]);
     }
 
     return $cache[$course->id];
@@ -1818,7 +1826,12 @@ function print_category_info($category, $depth, $showcourses = false) {
 
     $catlinkcss = $category->visible ? '' : ' class="dimmed" ';
 
-    $coursecount = count_records('course') <= FRONTPAGECOURSELIMIT;
+    static $coursecount = null;
+    if (null === $coursecount) {
+        // only need to check this once
+        $coursecount = count_records('course') <= FRONTPAGECOURSELIMIT;
+    }
+
     if ($showcourses and $coursecount) {
         $catimage = '<img src="'.$CFG->pixpath.'/i/course.gif" alt="" />';
     } else {

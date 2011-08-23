@@ -1826,19 +1826,21 @@ class hotpot_xml_quiz extends hotpot_xml_tree {
         $this->html = preg_replace('|</head>|i', $script.'</head>', $this->html, 1);
     }
     function insert_submission_form($attemptid, $startblock, $endblock, $keep_contents=false, $targetframe='') {
-        $form_name = 'store';
+        $form_id = 'store';
         $form_fields = ''
+        .   '<fieldset style="display:none">'
         .   '<input type="hidden" name="attemptid" value="'.$attemptid.'" />'
         .   '<input type="hidden" name="starttime" value="" />'
         .   '<input type="hidden" name="endtime" value="" />'
         .   '<input type="hidden" name="mark" value="" />'
         .   '<input type="hidden" name="detail" value="" />'
         .   '<input type="hidden" name="status" value="" />'
+        .   '</fieldset>'
         ;
-        $this->insert_form($startblock, $endblock, $form_name, $form_fields, $keep_contents, false, $targetframe);
+        $this->insert_form($startblock, $endblock, $form_id, $form_fields, $keep_contents, false, $targetframe);
     }
     function insert_giveup_form($attemptid, $startblock, $endblock, $keep_contents=false) {
-        $form_name = ''; // no <form> tag will be generated
+        $form_id = ''; // no <form> tag will be generated
         $form_fields = ''
         .   '<button onclick="Finish('.HOTPOT_STATUS_ABANDONED.')" class="FuncButton" '
         .   'onfocus="FuncBtnOver(this)" onblur="FuncBtnOut(this)" '
@@ -1846,9 +1848,9 @@ class hotpot_xml_quiz extends hotpot_xml_tree {
         .   'onmousedown="FuncBtnDown(this)" onmouseup="FuncBtnOut(this)">'
         .   get_string('giveup', 'hotpot').'</button>'
         ;
-        $this->insert_form($startblock, $endblock, $form_name, $form_fields, $keep_contents, true);
+        $this->insert_form($startblock, $endblock, $form_id, $form_fields, $keep_contents, true);
     }
-    function insert_form($startblock, $endblock, $form_name, $form_fields, $keep_contents, $center=false, $targetframe='') {
+    function insert_form($startblock, $endblock, $form_id, $form_fields, $keep_contents, $center=false, $targetframe='') {
         global $CFG;
         $search = '#('.preg_quote($startblock).')(.*?)('.preg_quote($endblock).')#s';
         $replace = $form_fields;
@@ -1856,12 +1858,16 @@ class hotpot_xml_quiz extends hotpot_xml_tree {
             $replace .= '\\2';
         }
         if ($targetframe) {
-            $frametarget = ' target="'.$targetframe.'"';
-        } else {
+            $frametarget = ' onsubmit="'."this.target='$targetframe';".'"';
+        } else if (! empty($CFG->framename)) {
+            $frametarget = ' onsubmit="'."this.target='$CFG->framename';".'"';
+        } else if (! empty($CFG->frametarget)) {
             $frametarget = $CFG->frametarget;
+        } else {
+            $frametarget = '';
         }
-        if ($form_name) {
-            $replace = '<form action="'.$CFG->wwwroot.'/mod/hotpot/attempt.php" method="post" name="'.$form_name.'"'.$frametarget.'>'.$replace.'</form>';
+        if ($form_id) {
+            $replace = '<form action="'.$CFG->wwwroot.'/mod/hotpot/attempt.php" method="post" id="'.$form_id.'"'.$frametarget.'>'.$replace.'</form>';
         }
         if ($center) {
             $replace = '<div style="margin-left:auto; margin-right:auto; text-align: center;">'.$replace.'</div>';
@@ -1887,44 +1893,46 @@ class hotpot_xml_quiz extends hotpot_xml_tree {
             $quote = '["'."']?"; // single, double, or no quote
 
             // patterns to media files types and paths
-            $filetype = "avi|mpeg|mpg|mp3|mov|wmv|flv";
+            $filetypes = "avi|mpeg|mpg|mp3|mov|wmv|flv";
             if ($CFG->filter_mediaplugin_enable_swf) {
-                $filetype .= '|swf';
+                $filetypes .= '|swf';
             }
-            $filepath = ".*?\.($filetype)";
+            $filepath = '[^"'."']*".'\\.(?:'.$filetypes.')[^"'."']*";
 
             $tagopen = '(?:(<)|(\\\\u003C))'; // left angle-bracket (uses two parenthese)
+            $tagchars = '(?(1)[^>]|(?(2).(?!\\\\u003E)))*?';  // string of chars inside the tag
             $tagclose = '(?(1)>|(?(2)\\\\u003E))'; // right angle-bracket (to match the left one)
             $tagreopen = '(?(1)<|(?(2)\\\\u003C))'; // another left angle-bracket (to match the first one)
 
-            // pattern to match <PARAM> tags which contain the file path
+            // pattern to match <param> tags which contain the file path
+            $param_names = 'movie|src|url|flashvars';
             //  wmp        : url
             //  quicktime  : src
             //  realplayer : src
-            //  flash      : movie (doesn't need replacing)
-            $param_url = "/{$tagopen}param{$space}name=$quote(?:movie|src|url)$quote{$space}value=$quote($filepath)$quote.*?$tagclose/is";
+            //  flash      : movie, flashvars
+            $param_url = '/'.$tagopen.'param'.'\s'.$tagchars.'name="(?:'.$param_names.')"'.$tagchars.'value="('.$filepath.')"'.$tagchars.$tagclose.'/is';
 
             // pattern to match <a> tags which link to multimedia files
-            $link_url = "/{$tagopen}a{$space}href=$quote($filepath)$quote.*?$tagclose.*?$tagreopen\/a$tagclose/is";
+            $link_url = '/'.$tagopen.'a'.'\s'.$tagchars.'href="('.$filepath.')"'.$tagchars.$tagclose.'.*?'.$tagreopen.'\/a'.$tagclose.'/is';
 
             // extract <object> tags
-            preg_match_all("/{$tagopen}object.*?{$tagclose}(.*?)(?:{$tagreopen}\/object{$tagclose})+/is", $this->html, $objects);
+            $object_tag = '/'.$tagopen.'object'.'\s'.$tagchars.$tagclose.'(.*?)'.'(?:'.$tagreopen.'\/object'.$tagclose.')+/is';
+            preg_match_all($object_tag, $this->html, $objects);
 
             $i_max = count($objects[0]);
             for ($i=0; $i<$i_max; $i++) {
 
-                // extract URL from <PARAM> or <A>
+                // extract URL from <param> or <a>
                 $url = '';
                 if (preg_match($param_url, $objects[3][$i], $matches) || preg_match($link_url, $objects[3][$i], $matches)) {
                     $url = $matches[3];
                 }
-
                 if ($url) {
                     // strip inner tags (e.g. <embed>)
                     $txt = preg_replace("/$tagopen.*?$tagclose/", '', $objects[3][$i]);
 
                     // if url is in the query string, remove the leading characters
-                    $url = preg_replace('/^[^?]*\?([^=]+=[^&]*&)*[^=]+=([^&]*)$/', '$2', $url, 1);
+                    $url = preg_replace('/^([^=]+=[^&]*&)*[^=]+=(http:[^&]*)$/', '$2', $url, 1);
                     $link = '<a href="'.$url.'">'.$txt.'</a>';
 
                     $new_object = hotpot_mediaplayer_moodle($this, $link);

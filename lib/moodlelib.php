@@ -600,6 +600,22 @@ function clean_param($param, $type) {
 }
 
 /**
+ * Return true if given value is integer or string with integer value
+ *
+ * @param mixed $value String or Int
+ * @return bool true if number, false if not
+ */
+function is_number($value) {
+    if (is_int($value)) {
+        return true;
+    } else if (is_string($value)) {
+        return ((string)(int)$value) === $value;
+    } else {
+        return false;
+    }
+}
+
+/**
  * This function is useful for testing whether something you got back from
  * the HTML editor actually contains anything. Sometimes the HTML editor
  * appear to be empty, but actually you get back a <br> tag or something.
@@ -2175,9 +2191,17 @@ function require_course_login($courseorid, $autologinguest=true, $cm=null, $setw
 
     } else if ((is_object($courseorid) and $courseorid->id == SITEID)
           or (!is_object($courseorid) and $courseorid == SITEID)) {
-        //login for SITE not required
-        user_accesstime_log(SITEID);
-        return;
+              //login for SITE not required
+        if ($cm and empty($cm->visible)) {
+            // hidden activities are not accessible without login
+            require_login($courseorid, $autologinguest, $cm, $setwantsurltome);
+        } else if ($cm and !empty($CFG->enablegroupings) and $cm->groupmembersonly) {
+            // not-logged-in users do not have any group membership
+            require_login($courseorid, $autologinguest, $cm, $setwantsurltome);
+        } else {
+            user_accesstime_log(SITEID);
+            return;
+        }
 
     } else {
         // course login always required
@@ -2959,7 +2983,7 @@ function update_user_record($username, $authplugin) {
                 continue;
             }
             if ($confval === 'onlogin') {
-                $value = addslashes(stripslashes($value));   // Just in case
+                $value = addslashes($value);
                 // MDL-4207 Don't overwrite modified user profile values with
                 // empty LDAP values when 'unlocked if empty' is set. The purpose
                 // of the setting 'unlocked if empty' is to allow the user to fill
@@ -3123,14 +3147,15 @@ function authenticate_user_login($username, $password) {
             error_log('[client '.getremoteaddr()."]  $CFG->wwwroot  Disabled Login:  $username  ".$_SERVER['HTTP_USER_AGENT']);
             return false;
         }
-        if (!empty($user->deleted)) {
-            add_to_log(0, 'login', 'error', 'index.php', $username);
-            error_log('[client '.getremoteaddr()."]  $CFG->wwwroot  Deleted Login:  $username  ".$_SERVER['HTTP_USER_AGENT']);
-            return false;
-        }
         $auths = array($auth);
 
     } else {
+        // check if there's a deleted record (cheaply)
+        if (get_field('user', 'id', 'username', $username, 'deleted', 1, '')) {
+            error_log('[client '.$_SERVER['REMOTE_ADDR']."]  $CFG->wwwroot  Deleted Login:  $username  ".$_SERVER['HTTP_USER_AGENT']);
+            return false;
+        }
+
         $auths = $authsenabled;
         $user = new object();
         $user->id = 0;     // User does not exist
@@ -3215,6 +3240,11 @@ function complete_user_login($user) {
     global $CFG, $USER;
 
     $USER = $user; // this is required because we need to access preferences here!
+
+    if (!empty($CFG->regenloginsession)) {
+        // please note this setting may break some auth plugins
+        session_regenerate_id();
+    }
 
     reload_user_preferences();
 
@@ -5233,6 +5263,7 @@ function places_to_search_for_lang_strings() {
         'gradereport_' => array('grade/report'),
         'gradeimport_' => array('grade/import'),
         'gradeexport_' => array('grade/export'),
+        'qformat_' => array('question/format'),
         'profilefield_' => array('user/profile/field'),
         '' => array('mod')
     );
@@ -5708,6 +5739,49 @@ function get_list_of_charsets() {
 }
 
 /**
+ * For internal use only.
+ * @return array with two elements, the path to use and the name of the lang.
+ */
+function get_list_of_countries_language() {
+	global $CFG;
+
+	$lang = current_language();
+    if (is_readable($CFG->dataroot.'/lang/'. $lang .'/countries.php')) {
+        return array($CFG->dataroot, $lang);
+    }
+    if (is_readable($CFG->dirroot .'/lang/'. $lang .'/countries.php')) {
+        return array($CFG->dirroot , $lang);
+    }
+
+    if ($lang == 'en_utf8') {
+    	return;
+    } 
+
+    $parentlang = get_string('parentlanguage');
+    if (substr($parentlang, 0, 1) != '[') {
+	    if (is_readable($CFG->dataroot.'/lang/'. $parentlang .'/countries.php')) {
+	        return array($CFG->dataroot, $parentlang);
+	    }
+	    if (is_readable($CFG->dirroot .'/lang/'. $parentlang .'/countries.php')) {
+	        return array($CFG->dirroot , $parentlang);
+	    }
+
+	    if ($parentlang == 'en_utf8') {
+	        return;
+	    } 
+    }
+
+    if (is_readable($CFG->dataroot.'/lang/en_utf8/countries.php')) {
+        return array($CFG->dataroot, 'en_utf8');
+    }
+    if (is_readable($CFG->dirroot .'/lang/en_utf8/countries.php')) {
+        return array($CFG->dirroot , 'en_utf8');
+    }
+
+    return array(null, null);
+}
+
+/**
  * Returns a list of country names in the current language
  *
  * @uses $CFG
@@ -5715,36 +5789,31 @@ function get_list_of_charsets() {
  * @return array
  */
 function get_list_of_countries() {
-    global $CFG, $USER;
+    global $CFG;
 
-    $lang = current_language();
+    list($path, $lang) = get_list_of_countries_language();
 
-    if (!file_exists($CFG->dirroot .'/lang/'. $lang .'/countries.php') &&
-        !file_exists($CFG->dataroot.'/lang/'. $lang .'/countries.php')) {
-        if ($parentlang = get_string('parentlanguage')) {
-            if (file_exists($CFG->dirroot .'/lang/'. $parentlang .'/countries.php') ||
-                file_exists($CFG->dataroot.'/lang/'. $parentlang .'/countries.php')) {
-                $lang = $parentlang;
-            } else {
-                $lang = 'en_utf8';  // countries.php must exist in this pack
-            }
-        } else {
-            $lang = 'en_utf8';  // countries.php must exist in this pack
-        }
+    if (empty($path)) {
+    	print_error('countriesphpempty', '', '', $lang);
     }
 
-    if (file_exists($CFG->dataroot .'/lang/'. $lang .'/countries.php')) {
-        include($CFG->dataroot .'/lang/'. $lang .'/countries.php');
-    } else if (file_exists($CFG->dirroot .'/lang/'. $lang .'/countries.php')) {
-        include($CFG->dirroot .'/lang/'. $lang .'/countries.php');
-    }
+    // Load all the strings into $string.
+    include($path . '/lang/' . $lang . '/countries.php');
 
-    if (!empty($string)) {
-        uasort($string, 'strcoll');
-    } else {
+    // See if there are local overrides to countries.php.
+    // If so, override those elements of $string.
+    if (is_readable($CFG->dirroot .'/lang/' . $lang . '_local/countries.php')) {
+        include($CFG->dirroot .'/lang/' . $lang . '_local/countries.php');
+    }
+    if (is_readable($CFG->dataroot.'/lang/' . $lang . '_local/countries.php')) {
+        include($CFG->dataroot.'/lang/' . $lang . '_local/countries.php');
+    }
+        
+    if (empty($string)) {
         print_error('countriesphpempty', '', '', $lang);
     }
 
+    uasort($string, 'strcoll');
     return $string;
 }
 
@@ -6836,7 +6905,7 @@ function shorten_text($text, $ideal=30, $exact = false) {
     // if the words shouldn't be cut in the middle...
     if (!$exact) {
         // ...search the last occurance of a space...
-		for ($k=strlen($truncate);$k>0;$k--) {
+        for ($k=strlen($truncate);$k>0;$k--) {
             if (!empty($truncate[$k]) && ($char = $truncate[$k])) {
                 if ($char == '.' or $char == ' ') {
                     $breakpos = $k+1;
@@ -6846,23 +6915,23 @@ function shorten_text($text, $ideal=30, $exact = false) {
                     break;                        // character boundary.
                 }
             }
-		}
+        }
 
-		if (isset($breakpos)) {
+        if (isset($breakpos)) {
             // ...and cut the text in this position
             $truncate = substr($truncate, 0, $breakpos);
-		}
-	}
+        }
+    }
 
     // add the defined ending to the text
-	$truncate .= $ending;
+    $truncate .= $ending;
 
     // close all unclosed html-tags
     foreach ($open_tags as $tag) {
         $truncate .= '</' . $tag . '>';
     }
 
-	return $truncate;
+    return $truncate;
 }
 
 
@@ -7242,8 +7311,17 @@ function address_in_subnet($addr, $subnetstr) {
         $subnet = trim($subnet);
         if (strpos($subnet, '/') !== false) { /// type 1
             list($ip, $mask) = explode('/', $subnet);
-            if ($mask === '' || $mask > 32) {
-                $mask = 32;
+            if (!is_number($mask) || $mask < 0 || $mask > 32) {
+                continue;
+            }
+            if ($mask == 0) {
+                return true;
+            }
+            if ($mask == 32) {
+                if ($ip === $addr) {
+                    return true;
+                }
+                continue;
             }
             $mask = 0xffffffff << (32 - $mask);
             $found = ((ip2long($addr) & $mask) == (ip2long($ip) & $mask));
@@ -8077,7 +8155,7 @@ function check_dir_exists($dir, $create=false, $recursive=false) {
 
     global $CFG;
 
-    if (strstr($dir, $CFG->dataroot.'/') === false) {
+    if (strstr(cleardoubleslashes($dir), cleardoubleslashes($CFG->dataroot.'/')) === false) {
         debugging('Warning. Wrong call to check_dir_exists(). $dir must be an absolute path under $CFG->dataroot ("' . $dir . '" is incorrect)', DEBUG_DEVELOPER);
     }
 
@@ -8091,9 +8169,8 @@ function check_dir_exists($dir, $create=false, $recursive=false) {
             if ($recursive) {
             /// We are going to make it recursive under $CFG->dataroot only
             /// (will help sites running open_basedir security and others)
-                $dir = str_replace($CFG->dataroot . '/', '', $dir);
+                $dir = str_replace(cleardoubleslashes($CFG->dataroot . '/'), '', cleardoubleslashes($dir));
             /// PHP 5.0 has recursive mkdir parameter, but 4.x does not :-(
-                $dir = str_replace('\\', '/', $dir); //windows compatibility
                 $dirs = explode('/', $dir); /// Extract path parts
             /// Iterate over each part with start point $CFG->dataroot
                 $dir = $CFG->dataroot . '/';

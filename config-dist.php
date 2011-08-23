@@ -76,7 +76,7 @@ $CFG->wwwroot   = 'http://example.com/moodle';
 // Next, specify the full OS directory path to this same location
 // Make sure the upper/lower case is correct.  Some examples:
 //
-//    $CFG->dirroot = 'c:\program files\easyphp\www\moodle';    // Windows
+//    $CFG->dirroot = 'C:\program files\easyphp\www\moodle';    // Windows
 //    $CFG->dirroot = '/var/www/html/moodle';     // Redhat Linux
 //    $CFG->dirroot = '/home/example/public_html/moodle'; // Cpanel host
 
@@ -131,6 +131,11 @@ $CFG->admin = 'admin';
 //
 // These are additional tweaks for which no GUI exists in Moodle yet.
 //
+// Starting in PHP 5.3 administrators should specify default timezone
+// in PHP.ini, you can also specify it here if needed.
+// See details at: http://php.net/manual/en/function.date-default-timezone-set.php
+// List of time zones at: http://php.net/manual/en/timezones.php
+//     date_default_timezone_set('Australia/Perth');
 //
 // Change the key pair lifetime for Moodle Networking
 // The default is 28 days. You would only want to change this if the key
@@ -178,7 +183,13 @@ $CFG->admin = 'admin';
 // This setting will prevent the 'My Courses' page being displayed when a student
 // logs in. The site front page will always show the same (logged-out) view.
 //     $CFG->disablemycourses = true;
-// 
+//
+// Enable this option if you need fully working default frontpage role,
+// please note it might cause serious memory and performance issues,
+// also there should not be any negative capabilities in default
+// frontpage role (MDL-19039).
+//     $CFG->fullusersbycapabilityonfrontpage = true;
+//
 // If this setting is set to true, then Moodle will track the IP of the 
 // current user to make sure it hasn't changed during a session.  This 
 // will prevent the possibility of sessions being hijacked via XSS, but it 
