@@ -72,31 +72,35 @@
                 }
                 foreach ($instances as $instance) {
                     $var = 'restore_'.$modname.'_instance_'.$instance->id;
-                    $$var = optional_param($var,0);
+                    $$var = optional_param($var,0,PARAM_INT);
                     $var = 'restore_user_info_'.$modname.'_instance_'.$instance->id;
-                    $$var = optional_param($var,0);
+                    $$var = optional_param($var,0,PARAM_INT);
                 }
             }
         }
         //restoreto
-        $restore_restoreto = required_param('restore_restoreto');
+        $restore_restoreto = required_param('restore_restoreto', PARAM_INT);
         //restore_metacourse
-        $restore_metacourse = required_param('restore_metacourse');
+        $restore_metacourse = required_param('restore_metacourse', PARAM_INT);
         //restore_users
-        $restore_users = required_param('restore_users');
+        $restore_users = required_param('restore_users', PARAM_INT);
+
+        $restore_groups = required_param('restore_groups', PARAM_INT);
         //restore_logs
-        $restore_logs = required_param('restore_logs');
+        $restore_logs = required_param('restore_logs', PARAM_INT);
         //restore_user_files
-        $restore_user_files = required_param('restore_user_files');
+        $restore_user_files = required_param('restore_user_files', PARAM_INT);
         //restore_course_files
-        $restore_course_files = required_param('restore_course_files');
+        $restore_course_files = required_param('restore_course_files', PARAM_INT);
         //restore_site_files
-        $restore_site_files = required_param('restore_site_files');
+        $restore_site_files = required_param('restore_site_files', PARAM_INT);
         //restore_gradebook_history
-        $restore_gradebook_history = required_param('restore_gradebook_history');
+        $restore_gradebook_history = required_param('restore_gradebook_history', PARAM_INT);
         //restore_messages
-        $restore_messages = required_param('restore_messages');
-        
+        $restore_messages = required_param('restore_messages', PARAM_INT);
+        //restore_blogs
+        $restore_blogs = required_param('restore_blogs', PARAM_INT);
+
         //Check we've selected a course to restore to
         $course_id = optional_param('course_id', 0, PARAM_INT);
 
@@ -126,11 +130,13 @@
         $restore->restoreto=$restore_restoreto;
         $restore->metacourse=$restore_metacourse;
         $restore->users=$restore_users;
+        $restore->groups=$restore_groups;
         $restore->logs=$restore_logs;
         $restore->user_files=$restore_user_files;
         $restore->course_files=$restore_course_files;
         $restore->site_files=$restore_site_files;
         $restore->messages=$restore_messages;
+        $restore->blogs=$restore_blogs;
         $restore->restore_gradebook_history=$restore_gradebook_history;
         $restore->course_id=$course_id;
         //add new vars to restore object
@@ -170,10 +176,7 @@
     }
 
     // pass in the course category param
-    $cat_id = optional_param('restore_restorecatto', 0, PARAM_INT);
-    if ($cat_id) {
-        $restore->restore_restorecatto = $cat_id;
-    }
+    $restore->restore_restorecatto = optional_param('restore_restorecatto', 0, PARAM_INT);
 
     //We have the object with data, put it in the session
     $SESSION->restore = $restore;
@@ -189,7 +192,7 @@
             error("You need to be a teacher or admin user to use this page.", "$CFG->wwwroot/login/index.php");
         }
     } else {
-        if (!has_capability('moodle/site:restore', get_context_instance(CONTEXT_SYSTEM, SITEID))) {
+        if (!has_capability('moodle/site:restore', get_context_instance(CONTEXT_SYSTEM))) {
             error("You need to be an admin user to use this page.", "$CFG->wwwroot/login/index.php");
         }
     }
@@ -200,7 +203,7 @@
     }
 
     //Depending the selected restoreto:
-    // If user is a teacher (and not creator):
+    // If user is a teacher (and not creator) or we are restoring from within SITEID:
     //    0-Current course, deleting: Put $restore->course_id and $restore->deleting (true), create the restore object
     //    1-Current course, adding: Put $restore->course_id and $restore->deleting (false), create the restore object
     // If the uses is a creator:
@@ -210,12 +213,9 @@
     //        put $restore->course_id and $restore->deleting (false), create the restore object.
     //    2-New course: Create the restore object and launch the execute.
 
-    //If the user is a teacher and not a creator
+    //If the user is a teacher and not a creator or we are restoring from within SITEID
 
-
-    //if (!has_capability('moodle/course:create', get_context_instance(CONTEXT_SYSTEM, SITEID))) {
-
-    if (!user_can_create_courses()) {
+    if (!user_can_create_courses() || $id == SITEID) {
         $restore->course_id = $id;
         if ($restore->restoreto == 0) {
             $restore->deleting = true;
@@ -225,7 +225,6 @@
     }
 
     //If the user is a creator (or admin)
-    //if (has_capability('moodle/course:create', get_context_instance(CONTEXT_SYSTEM, SITEID))) {
     if (user_can_create_courses()) {
         //Set restore->deleting as needed
         if ($restore->restoreto == 0) {
@@ -287,8 +286,8 @@
                     $changed = true;
                 }
             }
-            //If we have selected user files or messages, then users must be restored too
-            if ($restore->user_files || $restore->messages) {
+            //If we have selected user files or messages or blogs, then users must be restored too
+            if ($restore->user_files || $restore->messages || $restore->blogs) {
                 $changed = 1;
             }
             if ($changed) {

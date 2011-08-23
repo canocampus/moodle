@@ -643,7 +643,7 @@ class auth_plugin_ldap extends auth_plugin_base {
         // find users in DB that aren't in ldap -- to be removed!
         // this is still not as scalable (but how often do we mass delete?)
         if (!empty($this->config->removeuser)) {
-            $sql = "SELECT u.id, u.username, u.email
+            $sql = "SELECT u.id, u.username, u.email, u.auth 
                     FROM {$CFG->prefix}user u
                         LEFT JOIN $temptable e ON u.username = e.username
                     WHERE u.auth='ldap'
@@ -1647,11 +1647,8 @@ class auth_plugin_ldap extends auth_plugin_base {
      */
 
     function ldap_attributes () {
-        $fields = array("firstname", "lastname", "email", "phone1", "phone2",
-                        "department", "address", "city", "country", "description",
-                        "idnumber", "lang" );
         $moodleattributes = array();
-        foreach ($fields as $field) {
+        foreach ($this->userfields as $field) {
             if (!empty($this->config->{"field_map_$field"})) {
                 $moodleattributes[$field] = $this->config->{"field_map_$field"};
                 if (preg_match('/,/',$moodleattributes[$field])) {

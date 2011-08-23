@@ -72,7 +72,7 @@ if ($mform->is_cancelled()){
         } else {
             $newcategory->context = get_context_instance(CONTEXT_COURSECAT, $newcategory->id);
             mark_context_dirty($newcategory->context->path);
-            redirect('index.php?categoryedit=on', get_string('categoryadded', null, stripslashes($newcategory->name)));
+            redirect('index.php?categoryedit=on');
         }
     } elseif (has_capability('moodle/category:update', $context)) {
         $newcategory->id = $category->id;
@@ -113,11 +113,11 @@ if ($id && !$categoryadd && !$categoryupdate && false) {
         }
         $navbaritem = update_category_button($category->id);
         $creatorediting = !empty($USER->categoryediting);
-        $adminediting = (has_capability('moodle/site:config', get_context_instance(CONTEXT_SYSTEM, SITEID)) and $creatorediting);
+        $adminediting = (has_capability('moodle/site:config', get_context_instance(CONTEXT_SYSTEM)) and $creatorediting);
 
     } else {
         if (!$category->visible) {
-            error(get_string('notavailable', 'error'));
+            print_error('notavailable', 'error');
         }
         $navbaritem = print_course_search("", true, "navbar");
         $adminediting = false;

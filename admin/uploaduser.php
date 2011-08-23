@@ -66,9 +66,13 @@ $returnurl = $CFG->wwwroot.'/'.$CFG->admin.'/uploaduser.php';
 $bulknurl  = $CFG->wwwroot.'/'.$CFG->admin.'/user/user_bulk.php';
 
 // array of all valid fields for validation
-$STD_FIELDS = array('firstname', 'lastname', 'username', 'email', 'city', 'country', 'lang', 'auth', 'timezone', 'mailformat', 'maildisplay', 'maildigest', 'htmleditor',
-                    'ajax', 'autosubscribe', 'mnethostid', 'institution', 'department', 'idnumber', 'icq', 'phone1', 'phone2', 'address', 'url', 'description',
-                    'oldusername', 'emailstop', 'deleted',  'password');
+$STD_FIELDS = array('id', 'firstname', 'lastname', 'username', 'email', 
+        'city', 'country', 'lang', 'auth', 'timezone', 'mailformat', 
+        'maildisplay', 'maildigest', 'htmleditor', 'ajax', 'autosubscribe', 
+        'mnethostid', 'institution', 'department', 'idnumber', 'skype', 
+        'msn', 'aim', 'yahoo', 'icq', 'phone1', 'phone2', 'address', 
+        'url', 'description', 'oldusername', 'emailstop', 'deleted',  
+        'password');
 
 $PRF_FIELDS = array();
 
@@ -94,7 +98,7 @@ if (empty($iid)) {
         if ($readcount === false) {
             error($cir->get_error(), $returnurl);
         } else if ($readcount == 0) {
-            error(get_string('csvemptyfile', 'error'), $returnurl);
+            print_error('csvemptyfile', 'error', $returnurl);
         }
         // continue to form2
 

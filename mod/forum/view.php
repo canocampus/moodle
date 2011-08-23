@@ -116,7 +116,7 @@
 
     if (!empty($USER->id) && !has_capability('moodle/legacy:guest', $context, NULL, false)) {
         $SESSION->fromdiscussion = "$FULLME";
-        if (forum_is_forcesubscribed($forum->id)) {
+        if (forum_is_forcesubscribed($forum)) {
             $streveryoneisnowsubscribed = get_string('everyoneisnowsubscribed', 'forum');
             $strallowchoice = get_string('allowchoice', 'forum');
             echo '<span class="helplink">' . get_string("forcessubscribe", 'forum') . '</span><br />';
@@ -156,7 +156,7 @@
                     array('forcesubscribed' => '', 'cantsubscribe' => '')), '</div>';
         }
 
-        if (($forum->trackingtype == FORUM_TRACKING_OPTIONAL) && forum_tp_can_track_forums($forum)) {
+        if (forum_tp_can_track_forums($forum)) {
             echo '<div class="helplink" id="trackinglink">'. forum_get_tracking_link($forum). '</div>';
         }
 
@@ -219,9 +219,13 @@
             if ($mode) {
                 set_user_preference("forum_displaymode", $mode);
             }
+
+            $canreply    = forum_user_can_post($forum, $discussion, $USER, $cm, $course, $context);
+            $canrate     = has_capability('mod/forum:rate', $context);
             $displaymode = get_user_preferences("forum_displaymode", $CFG->forum_displaymode);
-            $canrate = has_capability('mod/forum:rate', $context);
-            forum_print_discussion($course, $cm, $forum, $discussion, $post, $displaymode, NULL, $canrate);
+
+            echo '&nbsp;'; // this should fix the floating in FF
+            forum_print_discussion($course, $cm, $forum, $discussion, $post, $displaymode, $canreply, $canrate);
             break;
 
         case 'eachuser':
@@ -229,24 +233,24 @@
                 print_box(format_text($forum->intro), 'generalbox', 'intro');
             }
             echo '<p align="center">';
-            if (forum_user_can_post_discussion($forum, -1, -1, $cm)) {
+            if (forum_user_can_post_discussion($forum, null, -1, $cm)) {
                 print_string("allowsdiscussions", "forum");
             } else {
                 echo '&nbsp;';
             }
             echo '</p>';
             if (!empty($showall)) {
-                forum_print_latest_discussions($course, $forum, 0, 'header', '', $currentgroup, $groupmode);
+                forum_print_latest_discussions($course, $forum, 0, 'header', '', -1, -1, -1, 0, $cm);
             } else {
-                forum_print_latest_discussions($course, $forum, $CFG->forum_manydiscussions, 'header', '', $currentgroup, $groupmode, $page);
+                forum_print_latest_discussions($course, $forum, -1, 'header', '', -1, -1, $page, $CFG->forum_manydiscussions, $cm);
             }
             break;
 
         case 'teacher':
             if (!empty($showall)) {
-                forum_print_latest_discussions($course, $forum, 0, 'header', '', $currentgroup, $groupmode);
+                forum_print_latest_discussions($course, $forum, 0, 'header', '', -1, -1, -1, 0, $cm);
             } else {
-                forum_print_latest_discussions($course, $forum, $CFG->forum_manydiscussions, 'header', '', $currentgroup, $groupmode, $page);
+                forum_print_latest_discussions($course, $forum, -1, 'header', '', -1, -1, $page, $CFG->forum_manydiscussions, $cm);
             }
             break;
 
@@ -256,9 +260,9 @@
             }
             echo '<br />';
             if (!empty($showall)) {
-                forum_print_latest_discussions($course, $forum, 0, 'header', '', $currentgroup, $groupmode);
+                forum_print_latest_discussions($course, $forum, 0, 'header', '', -1, -1, -1, 0, $cm);
             } else {
-                forum_print_latest_discussions($course, $forum, $CFG->forum_manydiscussions, 'header', '', $currentgroup, $groupmode, $page);
+                forum_print_latest_discussions($course, $forum, -1, 'header', '', -1, -1, $page, $CFG->forum_manydiscussions, $cm);
             }
 
 

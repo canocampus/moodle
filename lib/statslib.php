@@ -198,10 +198,12 @@ function stats_cron_daily($maxdays=1) {
         $sql = "INSERT INTO {$CFG->prefix}stats_daily (stattype, timeend, courseid, roleid, stat1, stat2)
 
                 SELECT 'enrolments' AS stattype, $nextmidnight AS timeend,
-                        c.id AS courseid, ra.roleid, COUNT(DISTINCT ra.userid) AS stat1, 0 AS stat2
-                  FROM {$CFG->prefix}role_assignments ra $enroljoin_na
-                 WHERE $enrolwhere_na
-              GROUP BY stattype, timeend, c.id, ra.roleid, stat2";
+                        pl.courseid, pl.roleid, COUNT(DISTINCT pl.userid) AS stat1, 0 AS stat2
+                  FROM (SELECT DISTINCT ra.roleid, ra.userid, c.id as courseid
+                          FROM {$CFG->prefix}role_assignments ra $enroljoin_na
+                         WHERE $enrolwhere_na
+                       ) pl
+              GROUP BY stattype, timeend, pl.courseid, pl.roleid, stat2";
 
         if (!execute_sql($sql, false)) {
             $failed = true;
@@ -390,17 +392,18 @@ function stats_cron_daily($maxdays=1) {
         $sql = "INSERT INTO {$CFG->prefix}stats_daily (stattype, timeend, courseid, roleid, stat1, stat2)
 
                 SELECT 'activity' AS stattype, $nextmidnight AS timeend, pl.courseid, pl.roleid,
-                       SUM(pl.statsreads) AS stat1, SUM(pl.statswrites) AS stat2
-                  FROM (SELECT DISTINCT ra.roleid, c.id AS courseid, sud.statsreads, sud.statswrites
+                       SUM(sud.statsreads) AS stat1, SUM(sud.statswrites) AS stat2
+                  FROM {$CFG->prefix}stats_user_daily sud,
+                       (SELECT DISTINCT ra.userid, ra.roleid, c.id AS courseid
                           FROM {$CFG->prefix}role_assignments ra $enroljoin
-                               JOIN {$CFG->prefix}stats_user_daily sud
-                                    ON (sud.userid = ra.userid AND sud.courseid = c.id) 
                          WHERE c.id <> ".SITEID." AND
                                ra.roleid <> $guestrole->id AND ra.userid <> $guest->id AND
-                               sud.timeend = $nextmidnight AND $enrolwhere
+                               $enrolwhere
                         ) pl
+                 WHERE sud.userid = pl.userid AND sud.courseid = pl.courseid AND
+                       sud.timeend = $nextmidnight AND sud.stattype='activity'  
               GROUP BY stattype, timeend, pl.courseid, pl.roleid
-                HAVING SUM(pl.statsreads) > 0 OR SUM(pl.statswrites) > 0";
+                HAVING SUM(sud.statsreads) > 0 OR SUM(sud.statswrites) > 0";
 
         if ($logspresent and !execute_sql($sql, false)) {
             $failed = true;
@@ -418,6 +421,7 @@ function stats_cron_daily($maxdays=1) {
                        SUM(sud.statsreads) AS stat1, SUM(sud.statswrites) AS stat2
                   FROM {$CFG->prefix}stats_user_daily sud
                  WHERE sud.timeend = $nextmidnight AND sud.courseid <> ".SITEID." AND
+                       sud.stattype='activity' AND
                        (sud.userid = $guest->id OR sud.userid
                          NOT IN (SELECT ra.userid
                                    FROM {$CFG->prefix}role_assignments ra $enroljoin
@@ -437,17 +441,19 @@ function stats_cron_daily($maxdays=1) {
         $sql = "INSERT INTO {$CFG->prefix}stats_daily (stattype, timeend, courseid, roleid, stat1, stat2)
 
                 SELECT 'activity' AS stattype, $nextmidnight AS timeend, pl.courseid, pl.roleid,
-                       SUM(pl.statsreads) AS stat1, SUM(pl.statswrites) AS stat2
-                  FROM (SELECT DISTINCT ra.roleid, c.id AS courseid, sud.statsreads, sud.statswrites
-                          FROM {$CFG->prefix}role_assignments ra $fpjoin
-                               JOIN {$CFG->prefix}stats_user_daily sud
-                                    ON (sud.userid = ra.userid AND sud.courseid = c.id)
-                         WHERE c.id = ".SITEID." AND ra.roleid <> $defaultfproleid AND
+                       SUM(sud.statsreads) AS stat1, SUM(sud.statswrites) AS stat2
+                  FROM {$CFG->prefix}stats_user_daily sud,
+                       (SELECT DISTINCT ra.userid, ra.roleid, c.id AS courseid
+                          FROM {$CFG->prefix}role_assignments ra $enroljoin
+                         WHERE c.id = ".SITEID." AND
+                               ra.roleid <> $defaultfproleid AND
                                ra.roleid <> $guestrole->id AND ra.userid <> $guest->id AND
-                               sud.timeend = $nextmidnight AND $fpwhere
+                               $enrolwhere
                         ) pl
+                 WHERE sud.userid = pl.userid AND sud.courseid = pl.courseid AND
+                       sud.timeend = $nextmidnight AND sud.stattype='activity'  
               GROUP BY stattype, timeend, pl.courseid, pl.roleid
-                HAVING SUM(pl.statsreads) > 0 OR SUM(pl.statswrites) > 0";
+                HAVING SUM(sud.statsreads) > 0 OR SUM(sud.statswrites) > 0";
 
         if ($logspresent and !execute_sql($sql, false)) {
             $failed = true;
@@ -463,6 +469,7 @@ function stats_cron_daily($maxdays=1) {
                        SUM(sud.statsreads) AS stat1, SUM(sud.statswrites) AS stat2
                   FROM {$CFG->prefix}stats_user_daily sud
                  WHERE sud.timeend = $nextmidnight AND sud.courseid = ".SITEID." AND
+                       sud.stattype='activity' AND
                        sud.userid <> $guest->id AND sud.userid <> 0 AND sud.userid
                          NOT IN (SELECT ra.userid
                                    FROM {$CFG->prefix}role_assignments ra $fpjoin
@@ -485,7 +492,8 @@ function stats_cron_daily($maxdays=1) {
                   FROM (SELECT sud.statsreads, sud.statswrites
                           FROM {$CFG->prefix}stats_user_daily sud
                          WHERE (sud.userid = $guest->id OR sud.userid = 0) AND
-                               sud.timeend = $nextmidnight AND sud.courseid = ".SITEID."
+                               sud.timeend = $nextmidnight AND sud.courseid = ".SITEID." AND
+                               sud.stattype='activity'
                         ) pl
               GROUP BY stattype, timeend, courseid, nroleid
                 HAVING SUM(pl.statsreads) > 0 OR SUM(pl.statswrites) > 0";
@@ -771,8 +779,7 @@ function stats_get_enrolled_sql($limit, $includedoanything) {
 
     $join = "JOIN {$CFG->prefix}context ctx
                   ON ctx.id = ra.contextid
-             JOIN {$CFG->prefix}course c    
-                  ON TRUE
+             CROSS JOIN {$CFG->prefix}course c
              JOIN {$CFG->prefix}role_capabilities rc
                   ON rc.roleid = ra.roleid";
     $where = "((rc.capability = 'moodle/course:view' $adm)
@@ -1010,33 +1017,33 @@ function stats_get_parameters($time,$report,$courseid,$mode,$roleid=0) {
         break;
 
     case STATS_REPORT_READS:
-        $param->fields = $db->Concat('timeend','roleid').' AS uniqueid, timeend, roleid, stat1 as line1';
+        $param->fields = sql_concat('timeend','roleid').' AS uniqueid, timeend, roleid, stat1 as line1';
         $param->fieldscomplete = true; // set this to true to avoid anything adding stuff to the list and breaking complex queries.
         $param->aggregategroupby = 'roleid';
         $param->stattype = 'activity';
         $param->crosstab = true;
         $param->extras = 'GROUP BY timeend,roleid,stat1';
         if ($courseid == SITEID) {
-            $param->fields = $db->Concat('timeend','roleid').' AS uniqueid, timeend, roleid, sum(stat1) as line1';
+            $param->fields = sql_concat('timeend','roleid').' AS uniqueid, timeend, roleid, sum(stat1) as line1';
             $param->extras = 'GROUP BY timeend,roleid';
         }
         break;
 
     case STATS_REPORT_WRITES:
-        $param->fields = $db->Concat('timeend','roleid').' AS uniqueid, timeend, roleid, stat2 as line1';
+        $param->fields = sql_concat('timeend','roleid').' AS uniqueid, timeend, roleid, stat2 as line1';
         $param->fieldscomplete = true; // set this to true to avoid anything adding stuff to the list and breaking complex queries.
         $param->aggregategroupby = 'roleid';
         $param->stattype = 'activity';
         $param->crosstab = true;
         $param->extras = 'GROUP BY timeend,roleid,stat2';
         if ($courseid == SITEID) {
-            $param->fields = $db->Concat('timeend','roleid').' AS uniqueid, timeend, roleid, sum(stat2) as line1';
+            $param->fields = sql_concat('timeend','roleid').' AS uniqueid, timeend, roleid, sum(stat2) as line1';
             $param->extras = 'GROUP BY timeend,roleid';
         }
         break;
 
     case STATS_REPORT_ACTIVITY:
-        $param->fields = $db->Concat('timeend','roleid').' AS uniqueid, timeend, roleid, sum(stat1+stat2) as line1';
+        $param->fields = sql_concat('timeend','roleid').' AS uniqueid, timeend, roleid, sum(stat1+stat2) as line1';
         $param->fieldscomplete = true; // set this to true to avoid anything adding stuff to the list and breaking complex queries.
         $param->aggregategroupby = 'roleid';
         $param->stattype = 'activity';
@@ -1297,13 +1304,13 @@ function stats_get_report_options($courseid,$mode) {
     case STATS_MODE_DETAILED:
         $reportoptions[STATS_REPORT_USER_ACTIVITY] = get_string('statsreport'.STATS_REPORT_USER_ACTIVITY);
         $reportoptions[STATS_REPORT_USER_ALLACTIVITY] = get_string('statsreport'.STATS_REPORT_USER_ALLACTIVITY);
-        if (has_capability('moodle/site:viewreports', get_context_instance(CONTEXT_SYSTEM, SITEID))) {
+        if (has_capability('moodle/site:viewreports', get_context_instance(CONTEXT_SYSTEM))) {
             $site = get_site();
             $reportoptions[STATS_REPORT_USER_LOGINS] = get_string('statsreport'.STATS_REPORT_USER_LOGINS);
         }
         break;
     case STATS_MODE_RANKED:
-        if (has_capability('moodle/site:viewreports', get_context_instance(CONTEXT_SYSTEM, SITEID))) {
+        if (has_capability('moodle/site:viewreports', get_context_instance(CONTEXT_SYSTEM))) {
             $reportoptions[STATS_REPORT_ACTIVE_COURSES] = get_string('statsreport'.STATS_REPORT_ACTIVE_COURSES);
             $reportoptions[STATS_REPORT_ACTIVE_COURSES_WEIGHTED] = get_string('statsreport'.STATS_REPORT_ACTIVE_COURSES_WEIGHTED);
             $reportoptions[STATS_REPORT_PARTICIPATORY_COURSES] = get_string('statsreport'.STATS_REPORT_PARTICIPATORY_COURSES);
@@ -1553,7 +1560,7 @@ function stats_upgrade_table_for_roles ($period) {
     }
 
     if (!$teacher_role_id) {
-        $role            = get_roles_with_capability('moodle/legacy:teacher', CAP_ALLOW);
+        $role            = get_roles_with_capability('moodle/legacy:editingteacher', CAP_ALLOW);
         $role            = array_keys($role);
         $teacher_role_id = $role[0];
         $role            = get_roles_with_capability('moodle/legacy:student', CAP_ALLOW);

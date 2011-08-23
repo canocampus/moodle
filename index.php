@@ -64,6 +64,8 @@
 
     if ($CFG->forcelogin) {
         require_login();
+    } else {
+        user_accesstime_log();
     }
 
     if ($CFG->rolesactive) { // if already using roles system
@@ -197,7 +199,7 @@
 
                     if (!empty($USER->id)) {
                         $SESSION->fromdiscussion = $CFG->wwwroot;
-                        if (forum_is_subscribed($USER->id, $newsforum->id)) {
+                        if (forum_is_subscribed($USER->id, $newsforum)) {
                             $subtext = get_string('unsubscribe', 'forum');
                         } else {
                             $subtext = get_string('subscribe', 'forum');

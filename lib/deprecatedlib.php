@@ -119,7 +119,7 @@ function isadmin($userid=0) {
         return record_exists('user_admins', 'userid', $userid);
     }
 
-    $context = get_context_instance(CONTEXT_SYSTEM, SITEID);
+    $context = get_context_instance(CONTEXT_SYSTEM);
 
     return has_capability('moodle/legacy:admin', $context, $userid, false);
 }
@@ -145,7 +145,7 @@ function isteacher($courseid=0, $userid=0, $obsolete_includeadmin=true) {
     if ($courseid) {
         $context = get_context_instance(CONTEXT_COURSE, $courseid);
     } else {
-        $context = get_context_instance(CONTEXT_SYSTEM, SITEID);
+        $context = get_context_instance(CONTEXT_SYSTEM);
     }
 
     return (has_capability('moodle/legacy:teacher', $context, $userid, false)
@@ -199,7 +199,7 @@ function isteacherinanycourse($userid=0, $includeadmin=true) {
 
 /// Include admins if required
     if ($includeadmin) {
-        $context = get_context_instance(CONTEXT_SYSTEM, SITEID);
+        $context = get_context_instance(CONTEXT_SYSTEM);
         if (has_capability('moodle/legacy:admin', $context, $userid, false)) {
             return true;
         }
@@ -223,7 +223,7 @@ function isteacheredit($courseid, $userid=0, $obsolete_ignorestudentview=false) 
     }
 
     if (empty($courseid)) {
-        $context = get_context_instance(CONTEXT_SYSTEM, SITEID);
+        $context = get_context_instance(CONTEXT_SYSTEM);
     } else {
         $context = get_context_instance(CONTEXT_COURSE, $courseid);
     }
@@ -245,7 +245,7 @@ function iscreator ($userid=0) {
         return false;
     }
 
-    $context = get_context_instance(CONTEXT_SYSTEM, SITEID);
+    $context = get_context_instance(CONTEXT_SYSTEM);
 
     return (has_capability('moodle/legacy:coursecreator', $context, $userid, false)
          or has_capability('moodle/legacy:admin', $context, $userid, false));
@@ -271,7 +271,7 @@ function isstudent($courseid=0, $userid=0) {
     }
 
     if ($courseid == 0) {
-        $context = get_context_instance(CONTEXT_SYSTEM, SITEID);
+        $context = get_context_instance(CONTEXT_SYSTEM);
     } else {
         $context = get_context_instance(CONTEXT_COURSE, $courseid);
     }
@@ -355,7 +355,7 @@ function unenrol_student($userid, $courseid=0) {
         }
         /// remove from all legacy student roles
         if ($courseid == SITEID) {
-            $context = get_context_instance(CONTEXT_SYSTEM, SITEID);
+            $context = get_context_instance(CONTEXT_SYSTEM);
         } else if (!$context = get_context_instance(CONTEXT_COURSE, $courseid)) {
             return false;
         }
@@ -1577,4 +1577,103 @@ function sql_primary_role_subselect() {
                               ) ';
 }
 
+/**
+ * Can include a given document file (depends on second
+ * parameter) or just return info about it.
+ *
+ * @uses $CFG
+ * @param string $file ?
+ * @param bool $include ?
+ * @return ?
+ * @todo Finish documenting this function
+ */
+function document_file($file, $include=true) {
+    global $CFG;
+
+    debugging('The document_file() function is deprecated.', DEBUG_DEVELOPER);
+
+    $file = clean_filename($file);
+
+    if (empty($file)) {
+        return false;
+    }
+
+    $langs = array(current_language(), get_string('parentlanguage'), 'en');
+
+    foreach ($langs as $lang) {
+        $info = new object();
+        $info->filepath = $CFG->dirroot .'/lang/'. $lang .'/docs/'. $file;
+        $info->urlpath  = $CFG->wwwroot .'/lang/'. $lang .'/docs/'. $file;
+
+        if (file_exists($info->filepath)) {
+            if ($include) {
+                include($info->filepath);
+            }
+            return $info;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Print an error page displaying an error message.
+ * Old method, don't call directly in new code - use print_error instead.
+ *
+ *
+ * @uses $SESSION
+ * @uses $CFG
+ * @param string $message The message to display to the user about the error.
+ * @param string $link The url where the user will be prompted to continue. If no url is provided the user will be directed to the site index page.
+ */
+function error ($message, $link='') {
+
+    global $CFG, $SESSION, $THEME;
+    $message = clean_text($message);   // In case nasties are in here
+
+    if (defined('FULLME') && FULLME == 'cron') {
+        // Errors in cron should be mtrace'd.
+        mtrace($message);
+        die;
+    }
+
+    if (! defined('HEADER_PRINTED')) {
+        //header not yet printed
+        @header('HTTP/1.0 404 Not Found');
+        print_header(get_string('error'));
+    } else {
+        print_container_end_all(false, $THEME->open_header_containers);
+    }
+
+    echo '<br />';
+    print_simple_box($message, '', '', '', '', 'errorbox');
+
+    debugging('Stack trace:', DEBUG_DEVELOPER);
+
+    // in case we are logging upgrade in admin/index.php stop it
+    if (function_exists('upgrade_log_finish')) {
+        upgrade_log_finish();
+    }
+
+    if (empty($link) and !defined('ADMIN_EXT_HEADER_PRINTED')) {
+        if ( !empty($SESSION->fromurl) ) {
+            $link = $SESSION->fromurl;
+            unset($SESSION->fromurl);
+        } else {
+            $link = $CFG->wwwroot .'/';
+        }
+    }
+
+    if (!empty($link)) {
+        print_continue($link);
+    }
+
+    print_footer();
+
+    for ($i=0;$i<512;$i++) {  // Padding to help IE work with 404
+        echo ' ';
+    }
+
+    die;
+}
 ?>

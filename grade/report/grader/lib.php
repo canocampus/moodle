@@ -175,7 +175,7 @@ class grade_report_grader extends grade_report {
             $oldvalue = $data->{'old'.$varname};
 
             // was change requested?
-            if ($oldvalue == $postedvalue) {
+            if ($oldvalue == $postedvalue) { // string comparison
                 continue;
             }
 
@@ -299,35 +299,42 @@ class grade_report_grader extends grade_report {
         global $CFG;
 
         if (is_numeric($this->sortitemid)) {
+            $sort = "g.finalgrade $this->sortorder";
+
             $sql = "SELECT u.id, u.firstname, u.lastname, u.imagealt, u.picture, u.idnumber
-                    FROM {$CFG->prefix}grade_grades g RIGHT OUTER JOIN
-                         {$CFG->prefix}user u ON (u.id = g.userid AND g.itemid = $this->sortitemid)
-                         LEFT JOIN {$CFG->prefix}role_assignments ra ON u.id = ra.userid
-                         $this->groupsql
-                    WHERE ra.roleid in ($this->gradebookroles)
-                         $this->groupwheresql
-                    AND ra.contextid ".get_related_contexts_string($this->context)."
-                    ORDER BY g.finalgrade $this->sortorder";
-            $this->users = get_records_sql($sql, $this->get_pref('studentsperpage') * $this->page,
-                                $this->get_pref('studentsperpage'));
+                      FROM {$CFG->prefix}grade_grades g RIGHT OUTER JOIN
+                           {$CFG->prefix}user u ON (u.id = g.userid AND g.itemid = $this->sortitemid)
+                           LEFT JOIN {$CFG->prefix}role_assignments ra ON u.id = ra.userid
+                           $this->groupsql
+                     WHERE ra.roleid in ($this->gradebookroles)
+                           $this->groupwheresql
+                           AND ra.contextid ".get_related_contexts_string($this->context)."
+                  ORDER BY $sort";
+
         } else {
-            // default sort
-            // get users sorted by lastname
-
-            // If lastname or firstname is given as sortitemid, add the other name (firstname or lastname respectively) as second sort param
-            $sort2 = '';
-            if ($this->sortitemid == 'lastname') {
-                $sort2 = ', u.firstname '.$this->sortorder;
-            } elseif ($this->sortitemid == 'firstname') {
-                $sort2 = ', u.lastname '.$this->sortorder;
+            switch($this->sortitemid) {
+                case 'lastname':
+                    $sort = "u.lastname $this->sortorder, u.firstname $this->sortorder"; break;
+                case 'firstname':
+                    $sort = "u.firstname $this->sortorder, u.lastname $this->sortorder"; break;
+                case 'idnumber':
+                default:
+                    $sort = "u.idnumber $this->sortorder"; break;
             }
-            $sort2 .= ', u.id ASC'; // make sure the order is the same in case the sort item values are the same 
-            $roles = explode(',', $this->gradebookroles);
-            $this->users = get_role_users($roles, $this->context, false,
-                            'u.id, u.firstname, u.lastname, u.idnumber, u.imagealt, u.picture', 'u.'.$this->sortitemid .' '. $this->sortorder . $sort2,
-                            false, $this->currentgroup, $this->page * $this->get_pref('studentsperpage'), $this->get_pref('studentsperpage'));
 
+            $sql = "SELECT u.id, u.firstname, u.lastname, u.imagealt, u.picture, u.idnumber
+                      FROM {$CFG->prefix}user u
+                           JOIN {$CFG->prefix}role_assignments ra ON u.id = ra.userid
+                           $this->groupsql
+                     WHERE ra.roleid in ($this->gradebookroles)
+                           $this->groupwheresql
+                           AND ra.contextid ".get_related_contexts_string($this->context)."
+                  ORDER BY $sort";
         }
+
+
+        $this->users = get_records_sql($sql, $this->get_pref('studentsperpage') * $this->page,
+                            $this->get_pref('studentsperpage'));
 
         if (empty($this->users)) {
             $this->userselect = '';
@@ -743,10 +750,14 @@ class grade_report_grader extends grade_report {
                     $cellclasses .= ' overridden';
                 }
 
+                if ($grade->is_excluded()) {
+                    $cellclasses .= ' excluded';
+                }
+
                 $studentshtml .= '<td class="'.$cellclasses.'">';
 
                 if ($grade->is_excluded()) {
-                    $studentshtml .= get_string('excluded', 'grades'); // TODO: improve visual representation of excluded grades
+                    $studentshtml .= get_string('excluded', 'grades') . ' ';
                 }
 
                 // Do not show any icons if no grade (no record in DB to match)
@@ -762,6 +773,8 @@ class grade_report_grader extends grade_report {
                 $gradepass = ' gradefail '; 
                 if ($grade->is_passed($item)) {
                     $gradepass = ' gradepass ';
+                } elseif (is_null($grade->is_passed($item))) {
+                    $gradepass = '';
                 }
 
                 // if in editting mode, we need to print either a text box
@@ -774,7 +787,7 @@ class grade_report_grader extends grade_report {
 
                     if ($item->scaleid && !empty($scales_array[$item->scaleid])) {
                         $scale = $scales_array[$item->scaleid];
-
+                        $gradeval = (int)$gradeval; // scales use only integers
                         $scales = explode(",", $scale->scale);
                         // reindex because scale is off 1
 
@@ -803,7 +816,7 @@ class grade_report_grader extends grade_report {
                             $scales = explode(",", $scale->scale);
 
                             // invalid grade if gradeval < 1
-                            if ((int) $gradeval < 1) {
+                            if ($gradeval < 1) {
                                 $studentshtml .= '<span class="gradevalue'.$hidden.$gradepass.'">-</span>';
                             } else {
                                 $gradeval = (int)bounded_number($grade->grade_item->grademin, $gradeval, $grade->grade_item->grademax); //just in case somebody changes scale
@@ -954,7 +967,7 @@ class grade_report_grader extends grade_report {
             // This query returns a count of ungraded grades (NULL finalgrade OR no matching record in grade_grades table)
             $SQL = "SELECT gi.id, COUNT(u.id) AS count
                       FROM {$CFG->prefix}grade_items gi
-                           JOIN {$CFG->prefix}user u                     ON TRUE
+                           CROSS JOIN {$CFG->prefix}user u
                            JOIN {$CFG->prefix}role_assignments ra        ON ra.userid = u.id
                            LEFT OUTER JOIN  {$CFG->prefix}grade_grades g ON (g.itemid = gi.id AND g.userid = u.id AND g.finalgrade IS NOT NULL) 
                            $groupsql
@@ -969,6 +982,11 @@ class grade_report_grader extends grade_report {
 
             foreach ($this->gtree->items as $itemid=>$unused) {
                 $item =& $this->gtree->items[$itemid];
+
+                if ($item->needsupdate) {
+                    $avghtml .= '<td class="cell c' . $columncount++.'"><span class="gradingerror">'.get_string('error').'</span></td>';
+                    continue;
+                }
 
                 if (!isset($sum_array[$item->id])) {
                     $sum_array[$item->id] = 0;

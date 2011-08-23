@@ -39,7 +39,7 @@ function glossary_add_instance($glossary) {
         $glossary->globalglossary = 0;
     }
 
-    if (!has_capability('mod/glossary:manageentries', get_context_instance(CONTEXT_SYSTEM, SITEID))) {
+    if (!has_capability('mod/glossary:manageentries', get_context_instance(CONTEXT_SYSTEM))) {
         $glossary->globalglossary = 0;
     }
 
@@ -72,7 +72,7 @@ function glossary_update_instance($glossary) {
         $glossary->globalglossary = 0;
     }
 
-    if (!has_capability('mod/glossary:manageentries', get_context_instance(CONTEXT_SYSTEM, SITEID))) {
+    if (!has_capability('mod/glossary:manageentries', get_context_instance(CONTEXT_SYSTEM))) {
         // keep previous
         unset($glossary->globalglossary);
     }
@@ -381,8 +381,13 @@ function glossary_grade_item_update($glossary, $grades=NULL) {
     if (!function_exists('grade_update')) { //workaround for buggy PHP versions
         require_once($CFG->libdir.'/gradelib.php');
     }
-
-    $params = array('itemname'=>$glossary->name, 'idnumber'=>$glossary->cmidnumber);
+    if(!empty($glossary->cmidnumber)){
+        $params = array('itemname'=>$glossary->name, 'idnumber'=>$glossary->cmidnumber);
+    }else{
+        // MDL-14303
+        $cm = get_coursemodule_from_instance('glossary', $glossary->id);
+        $params = array('itemname'=>$glossary->name, 'idnumber'=>$cm->id);
+    }
 
     if (!$glossary->assessed or $glossary->scale == 0) {
         $params['gradetype'] = GRADE_TYPE_NONE;
@@ -553,7 +558,7 @@ function glossary_get_entries_search($concept, $courseid) {
 
     //Check if the user is an admin
     $bypassadmin = 1; //This means NO (by default)
-    if (has_capability('moodle/course:viewhiddenactivities', get_context_instance(CONTEXT_SYSTEM, SITEID))) {
+    if (has_capability('moodle/course:viewhiddenactivities', get_context_instance(CONTEXT_SYSTEM))) {
         $bypassadmin = 0; //This means YES
     }
 
@@ -680,7 +685,7 @@ function glossary_print_entry_default ($entry) {
 function  glossary_print_entry_concept($entry) {
     $options = new object();
     $options->para = false;
-    $text = format_text(print_heading($entry->concept, '', 3, 'nolink'), FORMAT_MOODLE, $options);
+    $text = format_text(print_heading($entry->concept, '', 3, 'nolink', true), FORMAT_MOODLE, $options);
     if (!empty($entry->highlight)) {
         $text = highlight($entry->highlight, $text);
     }
@@ -849,7 +854,8 @@ function glossary_print_entry_icons($course, $cm, $glossary, $entry, $mode='',$h
 
     $return = '<span class="commands">';
     // Differentiate links for each entry.
-    $altsuffix = ': '.$entry->concept;
+    $altsuffix = ': '.strip_tags(format_text($entry->concept));
+
     if (!$entry->approved) {
         $output = true;
         $return .= get_string('entryishidden','glossary');
@@ -978,11 +984,13 @@ function glossary_print_entry_attachment($entry,$format=NULL,$align="right",$ins
 }
 
 function  glossary_print_entry_approval($cm, $entry, $mode,$align="right",$insidetable=true) {
+    global $CFG;
+
     if ( $mode == 'approval' and !$entry->approved ) {
         if ($insidetable) {
             echo '<table class="glossaryapproval" align="'.$align.'"><tr><td align="'.$align.'">';
         }
-        echo '<a title="'.get_string('approve','glossary').'" href="approve.php?id='.$cm->id.'&amp;eid='.$entry->id.'&amp;mode='.$mode.'"><img align="'.$align.'" src="check.gif" style="border:0px; width:34px; height:34px" alt="'.get_string('approve','glossary').'" /></a>';
+        echo '<a title="'.get_string('approve','glossary').'" href="approve.php?id='.$cm->id.'&amp;eid='.$entry->id.'&amp;mode='.$mode.'"><img align="'.$align.'" src="'.$CFG->pixpath.'/i/approve.gif" style="border:0px; width:34px; height:34px" alt="'.get_string('approve','glossary').'" /></a>';
         if ($insidetable) {
             echo '</td></tr></table>';
         }
@@ -1066,13 +1074,11 @@ function glossary_search($course, $searchterms, $extended = 0, $glossary = NULL)
         }
     }
 
-    if ( !$extended ) {
-        $definitionsearch = "0";
-    }
+    $definitionsearch = !empty($extended) ? "OR $definitionsearch" : '';
 
     $selectsql = "{$CFG->prefix}glossary_entries e,
                   {$CFG->prefix}glossary g $onlyvisibletable
-             WHERE ($conceptsearch OR $definitionsearch)
+             WHERE ($conceptsearch $definitionsearch)
                AND (e.glossaryid = g.id or e.sourceglossaryid = g.id) $onlyvisible
                AND g.id IN ($glos) AND e.approved != 0";
 

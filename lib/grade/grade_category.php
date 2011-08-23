@@ -197,6 +197,9 @@ class grade_category extends grade_object {
         if (empty($this->path)) {
             $this->path  = grade_category::build_path($this);
             $this->depth = substr_count($this->path, '/') - 1;
+            $updatechildren = true;
+        } else {
+            $updatechildren = false;
         }
 
         $this->apply_forced_settings();
@@ -215,7 +218,20 @@ class grade_category extends grade_object {
 
         $this->timemodified = time();
 
-        return parent::update($source);
+        $result = parent::update($source);
+
+        // now update paths in all child categories
+        if ($result and $updatechildren) {
+            if ($children = grade_category::fetch_all(array('parent'=>$this->id))) {
+                foreach ($children as $child) {
+                    $child->path  = null;
+                    $child->depth = 0;
+                    $child->update($source);
+                } 
+            }
+        }
+
+        return $result;
     }
 
     /**
@@ -469,12 +485,7 @@ class grade_category extends grade_object {
         }
 
         if ($oldgrade) {
-            if (is_null($oldgrade->finalgrade)) {
-                $oldfinalgrade = null;
-            } else {
-                // we need proper floats here for !== comparison later
-                $oldfinalgrade = (float)$oldgrade->finalgrade;
-            }
+            $oldfinalgrade = $oldgrade->finalgrade;
             $grade = new grade_grade($oldgrade, false);
             $grade->grade_item =& $this->grade_item;
 
@@ -504,7 +515,7 @@ class grade_category extends grade_object {
         // if no grades calculation possible or grading not allowed clear final grade
         if (empty($grade_values) or empty($items) or ($this->grade_item->gradetype != GRADE_TYPE_VALUE and $this->grade_item->gradetype != GRADE_TYPE_SCALE)) {
             $grade->finalgrade = null;
-            if ($grade->finalgrade !== $oldfinalgrade) {
+            if (!is_null($oldfinalgrade)) {
                 $grade->update('aggregation');
             }
             return;
@@ -541,7 +552,7 @@ class grade_category extends grade_object {
         if (count($grade_values) == 0) {
             // not enough attempts yet
             $grade->finalgrade = null;
-            if ($grade->finalgrade !== $oldfinalgrade) {
+            if (!is_null($oldfinalgrade)) {
                 $grade->update('aggregation');
             }
             return;
@@ -560,7 +571,7 @@ class grade_category extends grade_object {
         }
 
         // update in db if changed
-        if ($grade->finalgrade !== $oldfinalgrade) {
+        if (grade_floats_different($grade->finalgrade, $oldfinalgrade)) {
             $grade->update('aggregation');
         }
 
@@ -697,16 +708,15 @@ class grade_category extends grade_object {
 
         //find max grade
         foreach ($items as $item) {
-            if ($item->gradetype != GRADE_TYPE_VALUE) {
-                // sum only items with value grades, no scales and outcomes!
-                unset($grade_values[$item->id]);
-                continue;
-            }
             if ($item->aggregationcoef > 0) {
                 // extra credit from this activity - does not affect total
                 continue;
             }
-            $max += $item->grademax;
+            if ($item->gradetype == GRADE_TYPE_VALUE) {
+                $max += $item->grademax;
+            } else if ($item->gradetype == GRADE_TYPE_SCALE) {
+                $max += $item->grademax - 1; // scales min is 1
+            }
         }
 
         if ($this->grade_item->grademax != $max or $this->grade_item->grademin != 0 or $this->grade_item->gradetype != GRADE_TYPE_VALUE){
@@ -719,10 +729,10 @@ class grade_category extends grade_object {
         $this->apply_limit_rules($grade_values);
 
         $sum = array_sum($grade_values);
-        $grade->finalgrade = (float)bounded_number($this->grade_item->grademin, $sum, $this->grade_item->grademax);
+        $grade->finalgrade = bounded_number($this->grade_item->grademin, $sum, $this->grade_item->grademax);
 
         // update in db if changed
-        if ($grade->finalgrade !== $oldfinalgrade) {
+        if (grade_floats_different($grade->finalgrade, $oldfinalgrade)) {
             $grade->update('aggregation');
         }
 
@@ -858,7 +868,28 @@ class grade_category extends grade_object {
         // now find the requested category and connect categories as children
         $category = false;
         foreach ($cats as $catid=>$cat) {
-            if (!empty($cat->parent)) {
+            if (empty($cat->parent)) {
+                if ($cat->path !== '/'.$cat->id.'/') {
+                    $grade_category = new grade_category($cat, false);
+                    $grade_category->path  = '/'.$cat->id.'/';
+                    $grade_category->depth = 1;
+                    $grade_category->update('system');
+                    return $this->get_children($include_category_items);
+                }
+            } else {
+                if (empty($cat->path) or !preg_match('|/'.$cat->parent.'/'.$cat->id.'/$|', $cat->path)) {
+                    //fix paths and depts
+                    static $recursioncounter = 0; // prevents infinite recursion
+                    $recursioncounter++;
+                    if ($recursioncounter < 5) { 
+                        // fix paths and depths!
+                        $grade_category = new grade_category($cat, false);
+                        $grade_category->depth = 0;
+                        $grade_category->path  = null;
+                        $grade_category->update('system');
+                        return $this->get_children($include_category_items);
+                    }
+                } 
                 // prevent problems with duplicate sortorders in db
                 $sortorder = $cat->sortorder;
                 while(array_key_exists($sortorder, $cats[$cat->parent]->children)) {
@@ -866,7 +897,7 @@ class grade_category extends grade_object {
                     $sortorder++;
                 }
 
-                $cats[$cat->parent]->children[$sortorder] = $cat;
+                $cats[$cat->parent]->children[$sortorder] = &$cats[$catid];
             }
 
             if ($catid == $this->id) {
@@ -1033,7 +1064,7 @@ class grade_category extends grade_object {
         $this->parent          = $parent_category->id;
         $this->parent_category =& $parent_category;
         $this->path            = null;       // remove old path and depth - will be recalculated in update()
-        $this->depth           = null;       // remove old path and depth - will be recalculated in update()
+        $this->depth           = 0;          // remove old path and depth - will be recalculated in update()
         $this->update($source);
 
         return $this->update($source);
@@ -1104,6 +1135,10 @@ class grade_category extends grade_object {
      * @return object grade_category instance for course grade
      */
     function fetch_course_category($courseid) {
+        if (empty($courseid)) {
+            debugging('Missing course id!');
+            return false;
+        }
 
         // course category has no parent
         if ($course_category = grade_category::fetch(array('courseid'=>$courseid, 'parent'=>null))) {

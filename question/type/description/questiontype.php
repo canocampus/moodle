@@ -43,6 +43,7 @@ class description_qtype extends default_questiontype {
 
     function print_question(&$question, &$state, $number, $cmoptions, $options) {
         global $CFG;
+        $isfinished = question_state_is_graded($state->last_graded) || $state->event == QUESTION_EVENTCLOSE;
 
         if (!empty($cmoptions->id)) {
             $cm = get_coursemodule_from_instance('quiz', $cmoptions->id);
@@ -54,6 +55,7 @@ class description_qtype extends default_questiontype {
         }
 
         // For editing teachers print a link to an editing popup window
+        $editlink = '';
         if (question_has_capability_on($question, 'edit')) {
             $stredit = get_string('edit');
             $linktext = '<img src="'.$CFG->pixpath.'/t/edit.gif" alt="'.$stredit.'" />';
@@ -63,6 +65,12 @@ class description_qtype extends default_questiontype {
 
         $questiontext = $this->format_text($question->questiontext, $question->questiontextformat, $cmoptions);
         $image = get_question_image($question);
+
+        $generalfeedback = '';
+        if ($isfinished && $options->generalfeedback) {
+            $generalfeedback = $this->format_text($question->generalfeedback,
+                    $question->questiontextformat, $cmoptions);
+        }
 
         include "$CFG->dirroot/question/type/description/question.html";
     }

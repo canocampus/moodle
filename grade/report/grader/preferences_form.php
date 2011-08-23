@@ -153,7 +153,9 @@ class grader_report_preferences_form extends moodleform {
                     $type = 'select';
                     // MDL-11478
                     // get default aggregationposition from grade_settings
+                    if (!empty($CFG->{$full_pref})) {
                     $course_value = grade_get_setting($course->id, $pref, $CFG->{$full_pref});
+                    }
                     
                     if ($pref == 'aggregationposition') {
                         if (!empty($options[$course_value])) {
@@ -183,7 +185,7 @@ class grader_report_preferences_form extends moodleform {
 
                 $mform->addElement($type, $full_pref, $label, $options);
                 if ($lang_string != 'showuserimage') {
-                    $mform->setHelpButton($full_pref, array(false, get_string($lang_string, 'grades'), false, true, false, $help_string));
+                    $mform->setHelpButton($full_pref, array($lang_string, get_string($lang_string, 'grades'), 'grade'), true);
                 }
                 $mform->setDefault($full_pref, $pref_value);
                 $mform->setType($full_pref, PARAM_ALPHANUM);

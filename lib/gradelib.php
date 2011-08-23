@@ -63,10 +63,12 @@ require_once($CFG->libdir . '/grade/grade_outcome.php');
  * @param mixed $itemdetails object or array describing the grading item, NULL if no change
  */
 function grade_update($source, $courseid, $itemtype, $itemmodule, $iteminstance, $itemnumber, $grades=NULL, $itemdetails=NULL) {
-    global $USER;
+    global $USER, $CFG;
 
     // only following grade_item properties can be changed in this function
     $allowed = array('itemname', 'idnumber', 'gradetype', 'grademax', 'grademin', 'scaleid', 'multfactor', 'plusfactor', 'deleted', 'hidden');
+    // list of 10,5 numeric fields
+    $floats  = array('grademin', 'grademax', 'multfactor', 'plusfactor');
 
     // grade item identification
     $params = compact('courseid', 'itemtype', 'itemmodule', 'iteminstance', 'itemnumber');
@@ -143,9 +145,17 @@ function grade_update($source, $courseid, $itemtype, $itemmodule, $iteminstance,
                     // ignore it
                     continue;
                 }
-                if ($grade_item->{$k} != $v) {
-                    $grade_item->{$k} = $v;
-                    $update = true;
+                if (in_array($k, $floats)) {
+                    if (grade_floats_different($grade_item->{$k}, $v)) {
+                        $grade_item->{$k} = $v;
+                        $update = true;
+                    }
+
+                } else {
+                    if ($grade_item->{$k} != $v) {
+                        $grade_item->{$k} = $v;
+                        $update = true;
+                    }
                 }
             }
             if ($update) {
@@ -173,22 +183,79 @@ function grade_update($source, $courseid, $itemtype, $itemmodule, $iteminstance,
 
 /// Finally start processing of grades
     if (is_object($grades)) {
-        $grades = array($grades);
+        $grades = array($grades->userid=>$grades);
     } else {
         if (array_key_exists('userid', $grades)) {
-            $grades = array($grades);
+            $grades = array($grades['userid']=>$grades);
         }
     }
 
+/// normalize and verify grade array
+    foreach($grades as $k=>$g) {
+        if (!is_array($g)) {
+            $g = (array)$g;
+            $grades[$k] = $g;
+        }
+
+        if (empty($g['userid']) or $k != $g['userid']) {
+            debugging('Incorrect grade array index, must be user id! Grade ignored.');
+            unset($grades[$k]);
+        }
+    }
+
+    if (empty($grades)) {
+        return GRADE_UPDATE_FAILED;
+    }
+
+    $count = count($grades);
+    if ($count == 1) {
+        reset($grades);
+        $uid = key($grades);
+        $sql = "SELECT * FROM {$CFG->prefix}grade_grades WHERE itemid = $grade_item->id AND userid = $uid";
+
+    } else if ($count < 200) {
+        $uids = implode(',', array_keys($grades));
+        $sql = "SELECT * FROM {$CFG->prefix}grade_grades WHERE itemid = $grade_item->id AND userid IN ($uids)";
+
+    } else {
+        $sql = "SELECT * FROM {$CFG->prefix}grade_grades WHERE itemid = $grade_item->id";
+    }
+
+    $rs = get_recordset_sql($sql);
+
     $failed = false;
-    foreach ($grades as $grade) {
-        $grade = (array)$grade;
-        if (empty($grade['userid'])) {
-            $failed = true;
-            debugging('Invalid userid in grade submitted');
-            continue;
-        } else {
-            $userid = $grade['userid'];
+
+    while (count($grades) > 0) {
+        $grade_grade = null;
+        $grade       = null;
+
+        while ($rs and !rs_EOF($rs)) {
+            if (!$gd = rs_fetch_next_record($rs)) {
+                break;
+            }
+            $userid = $gd->userid;
+            if (!isset($grades[$userid])) {
+                // this grade not requested, continue
+                continue;
+            }
+            // existing grade requested
+            $grade       = $grades[$userid];
+            $grade_grade = new grade_grade($gd, false);
+            unset($grades[$userid]);
+            break;
+        }
+
+        if (is_null($grade_grade)) {
+            if (count($grades) == 0) {
+                // no more grades to process
+                break;
+            }
+
+            $grade       = reset($grades);
+            $userid      = $grade['userid'];
+            $grade_grade = new grade_grade(array('itemid'=>$grade_item->id, 'userid'=>$userid), false);
+            $grade_grade->load_optional_fields(); // add feedback and info too
+            unset($grades[$userid]);
         }
 
         $rawgrade       = false;
@@ -223,9 +290,13 @@ function grade_update($source, $courseid, $itemtype, $itemmodule, $iteminstance,
         }
 
         // update or insert the grade
-        if (!$grade_item->update_raw_grade($userid, $rawgrade, $source, $feedback, $feedbackformat, $usermodified, $dategraded, $datesubmitted)) {
+        if (!$grade_item->update_raw_grade($userid, $rawgrade, $source, $feedback, $feedbackformat, $usermodified, $dategraded, $datesubmitted, $grade_grade)) {
             $failed = true;
         }
+    }
+
+    if ($rs) {
+        rs_close($rs);
     }
 
     if (!$failed) {
@@ -346,7 +417,12 @@ function grade_get_grades($courseid, $itemtype, $itemmodule, $iteminstance, $use
                         $grade->dategraded     = $grade_grades[$userid]->get_dategraded();
 
                         // create text representation of grade
-                        if (in_array($grade_item->id, $needsupdate)) {
+                        if ($grade_item->gradetype == GRADE_TYPE_TEXT or $grade_item->gradetype == GRADE_TYPE_NONE) {
+                            $grade->grade          = null;
+                            $grade->str_grade      = '-';
+                            $grade->str_long_grade = $grade->str_grade;
+
+                        } else if (in_array($grade_item->id, $needsupdate)) {
                             $grade->grade          = false;
                             $grade->str_grade      = get_string('error');
                             $grade->str_long_grade = $grade->str_grade;
@@ -1110,7 +1186,7 @@ function remove_grade_letters($context, $showfeedback) {
 /**
  * Remove all grade related course data - history is kept
  * @param int $courseid
- * @param bool @showfeedback print feedback
+ * @param bool $showfeedback print feedback
  */
 function remove_course_grades($courseid, $showfeedback) {
     $strdeleted = get_string('deleted');
@@ -1144,6 +1220,17 @@ function remove_course_grades($courseid, $showfeedback) {
     if ($showfeedback) {
         notify($strdeleted.' - '.get_string('settings', 'grades'));
     }
+}
+
+/**
+ * Called when course category deleted - cleanup gradebook
+ * @param int $categoryid course category id
+ * @param int $newparentid empty means everything deleted, otherwise id of category where content moved
+ * @param bool $showfeedback print feedback
+ */
+function grade_course_category_delete($categoryid, $newparentid, $showfeedback) {
+    $context = get_context_instance(CONTEXT_COURSECAT, $categoryid);
+    delete_records('grade_letters', 'contextid', $context->id);
 }
 
 /**
@@ -1244,14 +1331,30 @@ function grade_course_reset($courseid) {
 }
 
 /**
- * Convert number to float or null
+ * Convert number to 5 decimalfloat, empty tring or null db compatible format
+ * (we need this to decide if db value changed)
  * @param mixed number
  * @return mixed float or null
  */
 function grade_floatval($number) {
-    if (is_null($number)) {
+    if (is_null($number) or $number === '') {
         return null;
     }
-    return (float)$number;
+    // we must round to 5 digits to get the same precision as in 10,5 db fields
+    // note: db rounding for 10,5 is different from php round() function
+    return round($number, 5);
 }
+
+/**
+ * Compare two float numbers safely. Uses 5 decimals php precision. Nulls accepted too.
+ * Used for skipping of db updates
+ * @param float $f1
+ * @param float $f2
+ * @return true if different
+ */
+function grade_floats_different($f1, $f2) {
+    // note: db rounding for 10,5 is different from php round() function
+    return (grade_floatval($f1) !== grade_floatval($f2));
+}
+
 ?>

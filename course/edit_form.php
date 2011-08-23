@@ -92,8 +92,6 @@ class course_edit_form extends moodleform {
 
         $mform->addElement('htmleditor','summary', get_string('summary'), array('rows'=> '10', 'cols'=>'65'));
         $mform->setHelpButton('summary', array('text', get_string('helptext')), true);
-        $mform->setDefault('summary', get_string('defaultcoursesummary'));
-        $mform->addRule('summary', get_string('missingsummary'), 'required', null, 'client');
         $mform->setType('summary', PARAM_RAW);
 
         $courseformats = get_list_of_plugins('course/format');
@@ -316,7 +314,8 @@ class course_edit_form extends moodleform {
         if (!empty($course)) {
             $enrol_object = $course;
         }
-        if (method_exists(enrolment_factory::factory($enrol_object->enrol), 'print_entry') && $enrol_object->enrol != 'manual'){
+        // If the print_entry method exists and the course enrol method isn't manual (both set or inherited from site), show cost
+        if (method_exists(enrolment_factory::factory($enrol_object->enrol), 'print_entry') && !($enrol_object->enrol == 'manual' || (empty($enrol_object->enrol) && $CFG->enrol == 'manual'))) {
             $costgroup=array();
             $currencies = get_list_of_currencies();
             $costgroup[]= &MoodleQuickForm::createElement('text','cost', '', 'maxlength="6" size="6"');
@@ -370,7 +369,8 @@ class course_edit_form extends moodleform {
 
 /// customizable role names in this course
 //--------------------------------------------------------------------------------
-        $mform->addElement('header','', get_string('roles'));
+        $mform->addElement('header','rolerenaming', get_string('rolerenaming'));
+        $mform->setHelpButton('rolerenaming', array('rolerenaming', get_string('rolerenaming')), true);
 
         if ($roles = get_records('role')) {
             foreach ($roles as $role) {

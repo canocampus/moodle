@@ -10,6 +10,9 @@
  * @package moodlecore
  */
 
+ /// Some constants
+ define('LASTACCESS_UPDATE_SECS', 60); /// Number of seconds to wait before
+                                       /// updating lastaccess information in DB.
 
 /**
  * Escape all dangerous characters in a data record
@@ -438,7 +441,7 @@ function get_courses($categoryid="all", $sort="c.sortorder ASC", $fields="c.*") 
         $sqland = "AND ";
     }
     if (!empty($USER->id)) {  // May need to check they are a teacher
-        if (!has_capability('moodle/course:create', get_context_instance(CONTEXT_SYSTEM, SITEID))) {
+        if (!has_capability('moodle/course:create', get_context_instance(CONTEXT_SYSTEM))) {
             $visiblecourses = "$sqland ((c.visible > 0) OR t.userid = '$USER->id')";
             $teachertable = "LEFT JOIN {$CFG->prefix}user_teachers t ON t.course = c.id";
         }
@@ -539,7 +542,7 @@ function get_courses_page($categoryid="all", $sort="c.sortorder ASC", $fields="c
         $sqland = "AND ";
     }
     if (!empty($USER) and !empty($USER->id)) {  // May need to check they are a teacher
-        if (!has_capability('moodle/course:create', get_context_instance(CONTEXT_SYSTEM, SITEID))) {
+        if (!has_capability('moodle/course:create', get_context_instance(CONTEXT_SYSTEM))) {
             $visiblecourses = "$sqland ((c.visible > 0) OR t.userid = '$USER->id')";
             $teachertable = "LEFT JOIN {$CFG->prefix}user_teachers t ON t.course=c.id";
         }
@@ -685,7 +688,8 @@ function get_courses_wmanagers($categoryid=0, $sort="c.sortorder ASC", $fields=a
             }
             $ctxids = array_unique($ctxids);
             $catctxids = implode( ',' , $ctxids);
-            unset($catpaths);unset($cpath);
+            unset($catpaths);
+            unset($cpath);
         } else {
             // take the ctx path from the first course
             // as all categories will be the same...
@@ -718,12 +722,17 @@ function get_courses_wmanagers($categoryid=0, $sort="c.sortorder ASC", $fields=a
                   ON ra.roleid = r.id
                 LEFT OUTER JOIN {$CFG->prefix}course c
                   ON (ctx.instanceid=c.id AND ctx.contextlevel=".CONTEXT_COURSE.")
-                WHERE (  c.id IS NOT NULL
-                         OR ra.contextid  IN ($catctxids) )
-                      AND ra.roleid IN ({$CFG->coursemanager})
+                WHERE ( c.id IS NOT NULL";
+        // under certain conditions, $catctxids is NULL
+        if($catctxids == NULL){
+            $sql .= ") ";
+        }else{
+            $sql .= " OR ra.contextid  IN ($catctxids) )";
+        }
+
+        $sql .= "AND ra.roleid IN ({$CFG->coursemanager})
                       $categoryclause
                 ORDER BY r.sortorder ASC, ctx.contextlevel ASC, ra.sortorder ASC";
-
         $rs = get_recordset_sql($sql);
 
         // This loop is fairly stupid as it stands - might get better
@@ -805,7 +814,7 @@ function get_my_courses($userid, $sort='visible DESC,sortorder ASC', $fields=NUL
     global $CFG,$USER;
 
     // Guest's do not have any courses
-    $sitecontext = get_context_instance(CONTEXT_SYSTEM, SITEID);
+    $sitecontext = get_context_instance(CONTEXT_SYSTEM);
     if (has_capability('moodle/legacy:guest',$sitecontext,$userid,false)) {
         return(array());
     }
@@ -1878,6 +1887,26 @@ function add_to_log($courseid, $module, $action, $url='', $info='', $cm=0, $user
         $url = html_entity_decode($url); // for php < 4.3.0 this is defined in moodlelib.php
     }
 
+    // Restrict length of log lines to the space actually available in the
+    // database so that it doesn't cause a DB error. Log a warning so that
+    // developers can avoid doing things which are likely to cause this on a
+    // routine basis.
+    $tl=textlib_get_instance();
+    if(!empty($info) && $tl->strlen($info)>255) {
+        $info=$tl->substr($info,0,252).'...';
+        debugging('Warning: logged very long info',DEBUG_DEVELOPER);
+    }
+    // Note: Unlike $info, URL appears to be already slashed before this function
+    // is called. Since database limits are for the data before slashes, we need
+    // to remove them...
+    $url=stripslashes($url);
+    // If the 100 field size is changed, also need to alter print_log in course/lib.php
+    if(!empty($url) && $tl->strlen($url)>100) {
+        $url=$tl->substr($url,0,97).'...';
+        debugging('Warning: logged very long URL',DEBUG_DEVELOPER);
+    }
+    $url=addslashes($url);
+
     if (defined('MDL_PERFDB')) { global $PERF ; $PERF->dbqueries++; $PERF->logwrites++;};
 
     if ($CFG->type = 'oci8po') {
@@ -1885,59 +1914,126 @@ function add_to_log($courseid, $module, $action, $url='', $info='', $cm=0, $user
             $info = ' ';
         }
     }
+    $sql ='INSERT INTO '. $CFG->prefix .'log (time, userid, course, ip, module, cmid, action, url, info)
+        VALUES (' . "'$timenow', '$userid', '$courseid', '$REMOTE_ADDR', '$module', '$cm', '$action', '$url', '$info')";
 
-    $result = $db->Execute('INSERT INTO '. $CFG->prefix .'log (time, userid, course, ip, module, cmid, action, url, info)
-        VALUES (' . "'$timenow', '$userid', '$courseid', '$REMOTE_ADDR', '$module', '$cm', '$action', '$url', '$info')");
+    $result = $db->Execute($sql);
 
     // MDL-11893, alert $CFG->supportemail if insert into log failed
     if (!$result && $CFG->supportemail) {
         $site = get_site();
         $subject = 'Insert into log failed at your moodle site '.$site->fullname;
-        $message = 'Insert into log table failed at '.date('l dS \of F Y h:i:s A').'. It is possible that your disk is full.';
-        
-        // email_to_user is not usable because email_to_user tries to write to the logs table, and this will get caught
-        // in an infinite loop, if disk is full
+        $message = "Insert into log table failed at ". date('l dS \of F Y h:i:s A') .".\n It is possible that your disk is full.\n\n";
+        $message .= "The failed SQL is:\n\n" . $sql;
+
+        // email_to_user is not usable because email_to_user tries to write to the logs table,
+        // and this will get caught in an infinite loop, if disk is full
         if (empty($CFG->noemailever)) {
-            mail($CFG->supportemail, $subject, $message);
+            $lasttime = get_config('admin', 'lastloginserterrormail');
+            if(empty($lasttime) || time() - $lasttime > 60*60*24) { // limit to 1 email per day
+                mail($CFG->supportemail, $subject, $message);
+                set_config('lastloginserterrormail', time(), 'admin');
+            }
         }
     }
 
-    if (!$result and debugging()) {
-        echo '<p>Error: Could not insert a new entry to the Moodle log</p>';  // Don't throw an error
+    if (!$result) {
+        debugging('Error: Could not insert a new entry to the Moodle log', DEBUG_ALL);
     }
 
-/// Store lastaccess times for the current user, do not use in cron and other commandline scripts
-/// only update the lastaccess/timeaccess fields only once every 60s
-    if (!empty($USER->id) && ($userid == $USER->id) && !defined('FULLME')) {
-        $res = $db->Execute('UPDATE '. $CFG->prefix .'user
-                                SET lastip=\''. $REMOTE_ADDR .'\', lastaccess=\''. $timenow .'\'
-                             WHERE id = \''. $userid .'\' AND '.$timenow.' - lastaccess > 60');
-        if (!$res) {
-            debugging('<p>Error: Could not insert a new entry to the Moodle log</p>');  // Don't throw an error
-        }
-        if ($courseid != SITEID && !empty($courseid)) {
-            if (defined('MDL_PERFDB')) { global $PERF ; $PERF->dbqueries++;};
+}
 
-            if ($ulid = get_field('user_lastaccess', 'id', 'userid', $userid, 'courseid', $courseid)) {
-                $res = $db->Execute("UPDATE {$CFG->prefix}user_lastaccess
-                                        SET timeaccess=$timenow
-                                     WHERE id = $ulid AND $timenow - timeaccess > 60");
-                if (!$res) {
-                    debugging('Error: Could not insert a new entry to the Moodle log');  // Don't throw an error
-                }
-            } else {
-                $res = $db->Execute("INSERT INTO {$CFG->prefix}user_lastaccess
-                                            ( userid,  courseid,  timeaccess)
-                                     VALUES ($userid, $courseid, $timenow)");
-                if (!$res) {
-                    debugging('Error: Could not insert a new entry to the Moodle log');  // Don't throw an error
+/**
+ * Store user last access times - called when use enters a course or site
+ *
+ * Note: we use ADOdb code directly in this function to save some CPU
+ * cycles here and there. They are simple operations not needing any
+ * of the postprocessing performed by dmllib.php
+ *
+ * @param int $courseid, empty means site
+ * @return void
+ */
+function user_accesstime_log($courseid=0) {
+
+    global $USER, $CFG, $PERF, $db;
+
+    if (!isloggedin() or !empty($USER->realuser)) {
+        // no access tracking
+        return;
+    }
+
+    if (empty($courseid)) {
+        $courseid = SITEID;
+    }
+
+    $timenow = time();
+
+/// Store site lastaccess time for the current user
+    if ($timenow - $USER->lastaccess > LASTACCESS_UPDATE_SECS) {
+    /// Update $USER->lastaccess for next checks
+        $USER->lastaccess = $timenow;
+        if (defined('MDL_PERFDB')) { global $PERF ; $PERF->dbqueries++;};
+
+        $remoteaddr = getremoteaddr();
+        if ($db->Execute("UPDATE {$CFG->prefix}user
+                             SET lastip = '$remoteaddr', lastaccess = $timenow
+                           WHERE id = $USER->id")) {
+        } else {
+            debugging('Error: Could not update global user lastaccess information');  // Don't throw an error
+        }
+    /// Remove this record from record cache since it will change
+        if (!empty($CFG->rcache)) {
+            rcache_unset('user', $USER->id);
+        }
+    }
+
+    if ($courseid == SITEID) {
+    ///  no user_lastaccess for frontpage
+        return;
+    }
+
+/// Store course lastaccess times for the current user
+    if (empty($USER->currentcourseaccess[$courseid]) or ($timenow - $USER->currentcourseaccess[$courseid] > LASTACCESS_UPDATE_SECS)) {
+        if (defined('MDL_PERFDB')) { global $PERF ; $PERF->dbqueries++; };
+
+        $exists = false; // To detect if the user_lastaccess record exists or no
+        if ($rs = $db->Execute("SELECT timeaccess
+                                  FROM {$CFG->prefix}user_lastaccess
+                                 WHERE userid = $USER->id AND courseid = $courseid")) {
+            if (!$rs->EOF) {
+                $exists = true;
+                $lastaccess = reset($rs->fields);
+                if ($timenow - $lastaccess <  LASTACCESS_UPDATE_SECS) {
+                /// no need to update now, it was updated recently in concurrent login ;-)
+                    $rs->Close();
+                    return;
                 }
             }
-            if (defined('MDL_PERFDB')) { global $PERF ; $PERF->dbqueries++;};
+            $rs->Close();
+        }
+
+    /// Update course lastaccess for next checks
+        $USER->currentcourseaccess[$courseid] = $timenow;
+        if (defined('MDL_PERFDB')) { global $PERF ; $PERF->dbqueries++; };
+
+        if ($exists) { // user_lastaccess record exists, update it
+            if ($db->Execute("UPDATE {$CFG->prefix}user_lastaccess
+                                 SET timeaccess = $timenow
+                               WHERE userid = $USER->id AND courseid = $courseid")) {
+            } else {
+                debugging('Error: Could not update course user lastacess information');  // Don't throw an error
+            }
+
+        } else { // user lastaccess record doesn't exist, insert it
+            if ($db->Execute("INSERT INTO {$CFG->prefix}user_lastaccess
+                                     (userid, courseid, timeaccess)
+                              VALUES ($USER->id, $courseid, $timenow)")) {
+            } else {
+                debugging('Error: Could not insert course user lastaccess information');  // Don't throw an error
+            }
         }
     }
 }
-
 
 /**
  * Select all log records based on SQL criteria
@@ -2038,7 +2134,7 @@ function count_login_failures($mode, $username, $lastlogin) {
 
     $select = 'module=\'login\' AND action=\'error\' AND time > '. $lastlogin;
 
-    if (has_capability('moodle/site:config', get_context_instance(CONTEXT_SYSTEM, SITEID))) {    // Return information about all accounts
+    if (has_capability('moodle/site:config', get_context_instance(CONTEXT_SYSTEM))) {    // Return information about all accounts
         if ($count->attempts = count_records_select('log', $select)) {
             $count->accounts = count_records_select('log', $select, 'COUNT(DISTINCT info)');
             return $count;
@@ -2155,7 +2251,7 @@ function user_can_create_courses() {
     global $USER;
     // if user has course creation capability at any site or course cat, then return true;
 
-    if (has_capability('moodle/course:create', get_context_instance(CONTEXT_SYSTEM, SITEID))) {
+    if (has_capability('moodle/course:create', get_context_instance(CONTEXT_SYSTEM))) {
         return true;
     } else {
         return (bool) count(get_creatable_categories());

@@ -43,7 +43,7 @@ class enrolment_plugin_authorize
 
         if (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] != 443) { // MDL-9836
             if (empty($CFG->loginhttps)) {
-                error(get_string('httpsrequired', 'enrol_authorize'));
+                print_error('httpsrequired', 'enrol_authorize');
             } else {
                 $wwwsroot = str_replace('http:','https:', $CFG->wwwroot);
                 redirect("$wwwsroot/course/enrol.php?id=$course->id");
@@ -197,16 +197,15 @@ class enrolment_plugin_authorize
         $extra->x_phone = '';
         $extra->x_fax = '';
 
-        $revieworder = false;
-        $action = AN_ACTION_AUTH_CAPTURE;
-
         if (!empty($CFG->an_authcode) && !empty($form->ccauthcode)) {
             $action = AN_ACTION_CAPTURE_ONLY;
             $extra->x_auth_code = $form->ccauthcode;
         }
         elseif (!empty($CFG->an_review)) {
-            $revieworder = true;
             $action = AN_ACTION_AUTH_ONLY;
+        }
+        else {
+            $action = AN_ACTION_AUTH_CAPTURE;
         }
 
         $message = '';
@@ -216,18 +215,8 @@ class enrolment_plugin_authorize
         }
 
         $SESSION->ccpaid = 1; // security check: don't duplicate payment
-        if ($order->transid == 0) { // TEST MODE
-            if ($revieworder) {
-                redirect($CFG->wwwroot, get_string("reviewnotify", "enrol_authorize"), '30');
-            }
-            else {
-                enrol_into_course($course, $USER, 'authorize');
-                redirect("$CFG->wwwroot/course/view.php?id=$course->id");
-            }
-            return;
-        }
 
-        if ($revieworder) { // review enabled, inform payment managers and redirect the user who have paid to main page.
+        if (AN_ACTION_AUTH_ONLY == $action) { // review enabled, inform payment managers and redirect the user who have paid to main page.
             $a = new stdClass;
             $a->url = "$CFG->wwwroot/enrol/authorize/index.php?order=$order->id";
             $a->orderid = $order->id;
@@ -439,7 +428,8 @@ class enrolment_plugin_authorize
             $captureday = intval($frm->an_capture_day);
             $emailexpired = intval($frm->an_emailexpired);
             if ($captureday > 0 || $emailexpired > 0) {
-                if ((time() - intval($mconfig->an_lastcron) > 3600 * 24)) {
+                $lastcron = get_field_sql('SELECT max(lastcron) FROM ' . $CFG->prefix . 'modules');
+                if ((time() - intval($lastcron) > 3600 * 24)) {
                     notify(get_string('admincronsetup', 'enrol_authorize'));
                 }
             }
@@ -514,7 +504,8 @@ class enrolment_plugin_authorize
         $emailexpired = ($emailexpired > 5) ? 5 : (($emailexpired < 0) ? 0 : $emailexpired);
 
         if (!empty($reviewval) && ($captureday > 0 || $emailexpired > 0)) {
-            if (time() - intval($mconfig->an_lastcron) > 3600 * 24) {
+            $lastcron = get_field_sql('SELECT max(lastcron) FROM ' . $CFG->prefix . 'modules');
+            if (time() - intval($lastcron) > 3600 * 24) {
                 return false;
             }
         }
@@ -582,7 +573,6 @@ class enrolment_plugin_authorize
         $settlementtime = authorize_getsettletime($timenow);
         $timediff30 = $settlementtime - (30 * $oneday);
         $mconfig = get_config('enrol/authorize');
-        set_config('an_lastcron', $timenow, 'enrol/authorize');
 
         mtrace("Processing authorize cron...");
 
@@ -600,26 +590,19 @@ class enrolment_plugin_authorize
         }
 
         $timediffcnf = $settlementtime - (intval($CFG->an_capture_day) * $oneday);
-        $sql = "SELECT * FROM {$CFG->prefix}enrol_authorize
-                WHERE (status = '" .AN_STATUS_AUTH. "')
-                  AND (timecreated < '$timediffcnf')
-                  AND (timecreated > '$timediff30')
-                ORDER BY courseid";
-
-        if (!$orders = get_records_sql($sql)) {
+        $select = "(status = '" .AN_STATUS_AUTH. "') AND (timecreated < '$timediffcnf') AND (timecreated > '$timediff30')";
+        if (!($ordercount = count_records_select('enrol_authorize', $select))) {
             mtrace("no pending orders");
             return;
         }
 
         $eachconn = intval($mconfig->an_eachconnsecs);
-        if (empty($eachconn)) $eachconn = 3;
-        elseif ($eachconn > 60) $eachconn = 60;
-
-        $ordercount = count((array)$orders);
+        $eachconn = (($eachconn > 60) ? 60 : (($eachconn <= 0) ? 3 : $eachconn));
         if (($ordercount * $eachconn) + intval($mconfig->an_lastcron) > $timenow) {
             mtrace("blocked");
             return;
         }
+        set_config('an_lastcron', $timenow, 'enrol/authorize');
 
         mtrace("    $ordercount orders are being processed now", ": ");
 
@@ -630,7 +613,8 @@ class enrolment_plugin_authorize
         $this->log = "AUTHORIZE.NET AUTOCAPTURE CRON: " . userdate($timenow) . "\n";
 
         $lastcourseid = 0;
-        foreach ($orders as $order) {
+        for ($rs = get_recordset_select('enrol_authorize', $select, 'courseid'); ($order = rs_fetch_next_record($rs)); )
+        {
             $message = '';
             $extra = NULL;
             if (AN_APPROVED == authorize_action($order, $message, $extra, AN_ACTION_PRIOR_AUTH_CAPTURE)) {
@@ -663,7 +647,7 @@ class enrolment_plugin_authorize
                 $this->log .= "Error, Order# $order->id: " . $message . "\n";
             }
         }
-
+        rs_close($rs);
         mtrace("processed");
 
         $timenow = time();
@@ -780,8 +764,8 @@ class enrolment_plugin_authorize
                 GROUP BY e.courseid
                 ORDER BY $sorttype DESC";
 
-        $courseinfos = get_records_sql($sql);
-        foreach($courseinfos as $courseinfo) {
+        for ($rs = get_recordset_sql($sql); ($courseinfo = rs_fetch_next_record($rs)); )
+        {
             $lastcourse = $courseinfo->courseid;
             $context = get_context_instance(CONTEXT_COURSE, $lastcourse);
             if (($paymentmanagers = get_users_by_capability($context, 'enrol/authorize:managepayments'))) {
@@ -803,6 +787,7 @@ class enrolment_plugin_authorize
                 }
             }
         }
+        rs_close($rs);
     }
 }
 ?>

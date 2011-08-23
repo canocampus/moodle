@@ -408,6 +408,33 @@ table.minicalendar tr td.weekend {
 }
 
 /***
+ *** Error message
+ ***/
+
+.errorbox {
+/*   color:#ffffff; */
+   border-color:#990000;
+   background-color:#FEF9F6;
+ }
+
+.errorboxcontent {
+   background-color:#FEF9F6;
+}
+ 
+
+/***
+ *** Grade
+ ***/
+
+.grade-report-grader table#user-grades td.cell span.gradepass {
+  background-color: #C2EBBD; 
+}
+
+.grade-report-grader table#user-grades td.cell span.gradefail {
+  background-color: #EBC4BD;
+}
+
+/***
  *** User
  ***/
 

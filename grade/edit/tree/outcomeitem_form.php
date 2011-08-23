@@ -38,12 +38,10 @@ class edit_outcomeitem_form extends moodleform {
         $mform->addRule('itemname', get_string('required'), 'required', null, 'client');
 
         $mform->addElement('text', 'iteminfo', get_string('iteminfo', 'grades'));
-        $mform->setHelpButton('iteminfo', array(false, get_string('iteminfo', 'grades'),
-                false, true, false, get_string('iteminfohelp', 'grades')));
+        $mform->setHelpButton('iteminfo', array('iteminfo', get_string('iteminfo', 'grades'), 'grade'), true);
 
         $mform->addElement('text', 'idnumber', get_string('idnumbermod'));
-        $mform->setHelpButton('idnumber', array(false, get_string('idnumbermod'),
-                false, true, false, get_string('idnumberhelp', 'grades')));
+        $mform->setHelpButton('idnumber', array('idnumber', get_string('idnumber', 'grades'), 'grade'), true);
 
         // allow setting of outcomes on module items too
         $options = array();
@@ -53,8 +51,7 @@ class edit_outcomeitem_form extends moodleform {
             }
         }
         $mform->addElement('select', 'outcomeid', get_string('outcome', 'grades'), $options);
-        $mform->setHelpButton('outcomeid', array(false, get_string('outcome', 'grades'),
-                false, true, false, get_string('outcomeidhelp', 'grades')));
+        $mform->setHelpButton('outcomeid', array('outcomeid', get_string('outcomeid', 'grades'), 'grade'), true);
         $mform->addRule('outcomeid', get_string('required'), 'required');
 
         $options = array(0=>get_string('none'));
@@ -65,8 +62,7 @@ class edit_outcomeitem_form extends moodleform {
             }
         }
         $mform->addElement('select', 'cmid', get_string('linkedactivity', 'grades'), $options);
-        $mform->setHelpButton('cmid', array(false, get_string('linkedactivity', 'grades'),
-                false, true, false, get_string('linkedactivityhelp', 'grades')));
+        $mform->setHelpButton('cmid', array('linkedactivity', get_string('linkedactivity', 'grades'), 'grade'), true);
         $mform->setDefault('cmid', 0);
 
         /*$mform->addElement('text', 'gradepass', get_string('gradepass', 'grades'));
@@ -107,6 +103,9 @@ class edit_outcomeitem_form extends moodleform {
                 } else if ($cat->aggregation == GRADE_AGGREGATE_EXTRACREDIT_MEAN) {
                     $coefstring = ($coefstring=='' or $coefstring=='aggregationcoefextra') ? 'aggregationcoefextra' : 'aggregationcoef';
 
+                } else if ($cat->aggregation == GRADE_AGGREGATE_SUM) {
+                    $coefstring = ($coefstring=='' or $coefstring=='aggregationcoefextrasum') ? 'aggregationcoefextrasum' : 'aggregationcoef';
+
                 } else {
                     $coefstring = 'aggregationcoef';
                 }
@@ -121,9 +120,13 @@ class edit_outcomeitem_form extends moodleform {
         }
 
         if ($coefstring !== '') {
-            $mform->addElement('text', 'aggregationcoef', get_string($coefstring, 'grades'));
-            $mform->setHelpButton('aggregationcoef', array(false, get_string($coefstring, 'grades'),
-                                    false, true, false, get_string($coefstring.'help', 'grades')));
+            if ($coefstring == 'aggregationcoefextrasum') {
+                // advcheckbox is not compatible with disabledIf!
+                $mform->addElement('checkbox', 'aggregationcoef', get_string($coefstring, 'grades'));
+            } else {
+                $mform->addElement('text', 'aggregationcoef', get_string($coefstring, 'grades'));
+            }
+            $mform->setHelpButton('aggregationcoef', array($coefstring, get_string($coefstring, 'grades'), 'grade'), true);
         }
 
 /// hidden params
@@ -195,13 +198,17 @@ class edit_outcomeitem_form extends moodleform {
                     $aggcoef = '';
                     if ($parent_category->aggregation == GRADE_AGGREGATE_WEIGHTED_MEAN) {
                         $aggcoef = 'aggregationcoefweight';
+
                     } else if ($parent_category->aggregation == GRADE_AGGREGATE_EXTRACREDIT_MEAN) {
                         $aggcoef = 'aggregationcoefextra';
+
+                    } else if ($parent_category->aggregation == GRADE_AGGREGATE_SUM) {
+                        $aggcoef = 'aggregationcoefextrasum';
                     }
+
                     if ($aggcoef !== '') {
                         $agg_el->setLabel(get_string($aggcoef, 'grades'));
-                        $mform->setHelpButton('aggregationcoef', array(false, get_string($aggcoef, 'grades'),
-                                false, true, false, get_string($aggcoef.'help', 'grades')));
+                        $mform->setHelpButton('aggregationcoef', array($aggcoef, get_string($aggcoef, 'grades'), 'grade'));
                     }
                 }
             }

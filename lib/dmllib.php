@@ -759,8 +759,12 @@ function recordset_to_array($rs) {
  * @return ADOFetchObj the object containing the fetched information
  */
 function rs_fetch_record(&$rs) {
-
     global $CFG;
+
+    if (!$rs) {
+        debugging('Incorrect $rs used!', DEBUG_DEVELOPER);
+        return false;
+    }
 
     $rec = $rs->FetchObj(); //Retrieve record as object without advance the pointer
 
@@ -788,6 +792,10 @@ function rs_fetch_record(&$rs) {
  * @return boolean true if the movement was successful and false if not (end of recordset)
  */
 function rs_next_record(&$rs) {
+    if (!$rs) {
+        debugging('Incorrect $rs used!', DEBUG_DEVELOPER);
+        return false;
+    }
 
     return $rs->MoveNext(); //Move the pointer to the next record
 }
@@ -809,6 +817,11 @@ function rs_next_record(&$rs) {
 function rs_fetch_next_record(&$rs) {
 
     global $CFG;
+
+    if (!$rs) {
+        debugging('Incorrect $rs used!', DEBUG_DEVELOPER);
+        return false;
+    }
 
     $rec = false;
     $recarr = $rs->FetchRow(); //Retrieve record as object without advance the pointer. It's quicker that FetchNextObj()
@@ -834,6 +847,10 @@ function rs_fetch_next_record(&$rs) {
  * @return bool
  */
 function rs_EOF($rs) {
+    if (!$rs) {
+        debugging('Incorrect $rs used!', DEBUG_DEVELOPER);
+        return true;
+    }
     return $rs->EOF;
 }
 
@@ -842,8 +859,13 @@ function rs_EOF($rs) {
  * Note that, once closed, the recordset must not be used anymore along the request.
  * Saves memory (optional but recommended).
  * @param ADORecordSet the recordset to be closed
+ * @return void
  */
 function rs_close(&$rs) {
+    if (!$rs) {
+        debugging('Incorrect $rs used!', DEBUG_DEVELOPER);
+        return;
+    }
 
     $rs->Close();
 }
@@ -1219,9 +1241,9 @@ function set_field($table, $newfield, $newvalue, $field1, $value1, $field2='', $
         if ($field1 == 'id') {
             rcache_unset($table, $value1);
         } else if ($field2 == 'id') {
-            rcache_unset($table, $value1);
+            rcache_unset($table, $value2);
         } else if ($field3 == 'id') {
-            rcache_unset($table, $value1);
+            rcache_unset($table, $value3);
         } else {
             rcache_unset_table($table);
         }
@@ -1785,9 +1807,14 @@ function sql_fullname($firstname='firstname', $lastname='lastname') {
  * @return string
  */
 function sql_concat() {
-    global $db;
+    global $db, $CFG;
 
     $args = func_get_args();
+/// PostgreSQL requires at least one char element in the concat, let's add it
+/// here (at the beginning of the array) until ADOdb fixes it
+    if ($CFG->dbfamily == 'postgres' && is_array($args)) {
+        array_unshift($args , "''");
+    }
     return call_user_func_array(array($db, 'Concat'), $args);
 }
 
@@ -2244,6 +2271,10 @@ function configure_dbconnection() {
         /// NOTE: Not 100% useful because GPC has been addslashed with the setting off
         ///       so IT'S MANDATORY TO ENABLE THIS UNDER php.ini or .htaccess for this DB
         ///       or to turn off magic_quotes to allow Moodle to do it properly
+        /// Now set the decimal separator to DOT, Moodle & PHP will always send floats to
+        /// DB using DOTS. Manually introduced floats (if using other characters) must be
+        /// converted back to DOTs (like gradebook does)
+            $db->Execute("ALTER SESSION SET NLS_NUMERIC_CHARACTERS='.,'");
             break;
     }
 }
@@ -2316,13 +2347,20 @@ function oracle_dirty_hack ($table, &$dataobject, $usecache = true) {
         }
     /// Now, we have one empty value, going to be inserted to one NOT NULL, VARCHAR2 or CLOB field
     /// Try to get the best value to be inserted
+
+    /// The '0' string doesn't need any transformation, skip
+        if ($fieldvalue === '0') {
+            continue;
+        }
+
+    /// Transformations start
         if (gettype($fieldvalue) == 'boolean') {
             $dataobject->$fieldname = '0'; /// Transform false to '0' that evaluates the same for PHP
         } else if (gettype($fieldvalue) == 'integer') {
             $dataobject->$fieldname = '0'; /// Transform 0 to '0' that evaluates the same for PHP
         } else if (gettype($fieldvalue) == 'NULL') {
             $dataobject->$fieldname = '0'; /// Transform NULL to '0' that evaluates the same for PHP
-        } else {
+        } else if ($fieldvalue === '') {
             $dataobject->$fieldname = ' '; /// Transform '' to ' ' that DONT'T EVALUATE THE SAME
                                            /// (we'll transform back again on get_records_XXX functions and others)!!
         }

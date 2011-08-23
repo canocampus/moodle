@@ -9,7 +9,7 @@ require_js(array('yui_dom-event', 'yui_connection', 'yui_animation', 'yui_autoco
 require_login();
 
 if (empty($CFG->usetags)) {
-    error(get_string('tagsaredisabled', 'tag'));
+    print_error('tagsaredisabled', 'tag');
 }
 
 $tag_id = optional_param('id', 0, PARAM_INT);
@@ -61,7 +61,7 @@ if ($tagnew = $tagform->get_data()) {
     tag_description_set($tag_id, stripslashes($tagnew->description), $tagnew->descriptionformat);
 
     if (has_capability('moodle/tag:manage', $systemcontext)) {
-        if (($tag->tagtype != 'default') && ($tagnew->tagtype != '1')) {
+        if (($tag->tagtype != 'default') && (!isset($tagnew->tagtype) || ($tagnew->tagtype != '1'))) {
             tag_type_set($tag->id, 'default');
 
         } elseif (($tag->tagtype != 'official') && ($tagnew->tagtype == '1')) {
@@ -69,7 +69,7 @@ if ($tagnew = $tagform->get_data()) {
         }
     }
 
-    if (!has_capability('moodle/tag:manage', $systemcontext)) {
+    if (!has_capability('moodle/tag:manage', $systemcontext) && !has_capability('moodle/tag:edit', $systemcontext)) {
         unset($tagnew->name);
         unset($tagnew->rawname);
 
@@ -87,9 +87,11 @@ if ($tagnew = $tagform->get_data()) {
 
         $tagnew->timemodified = time();
 
-        // rename tag if needed
-        if (!tag_rename($tag->id, $tagnew->rawname)) {
-            error('Error updating tag record');
+        if (has_capability('moodle/tag:manage', $systemcontext)) {
+            // rename tag
+            if(!tag_rename($tag->id, $tagnew->rawname)) {
+                error('Error updating tag record');
+            }
         }
     
         //updated related tags

@@ -3,7 +3,7 @@ require_once ($CFG->dirroot.'/course/moodleform_mod.php');
 require_once ($CFG->dirroot.'/mod/hotpot/lib.php');
 
 $HOTPOT_TEXTSOURCE = array(
-    HOTPOT_TEXTSOURCE_QUIZ => get_string('textsourcequiz', 'hotpot'), 
+    HOTPOT_TEXTSOURCE_QUIZ => get_string('textsourcequiz', 'hotpot'),
     HOTPOT_TEXTSOURCE_FILENAME => get_string('textsourcefilename', 'hotpot'),
     HOTPOT_TEXTSOURCE_FILEPATH => get_string('textsourcefilepath', 'hotpot'),
     HOTPOT_TEXTSOURCE_SPECIFIC => get_string('textsourcespecific', 'hotpot')
@@ -61,7 +61,7 @@ class mod_hotpot_mod_form extends moodleform_mod {
         $mform->setType('name', PARAM_TEXT);
 
 // Location
-        $sitecontext = get_context_instance(CONTEXT_SYSTEM, SITEID);
+        $sitecontext = get_context_instance(CONTEXT_SYSTEM);
         if (has_capability('moodle/course:managefiles', $sitecontext)) {
             $site = get_site();
             if ($COURSE->id==$site->id) {
@@ -272,7 +272,7 @@ class mod_hotpot_mod_form extends moodleform_mod {
         } else {
             if ($data['location']==$COURSE->id) {
                 // this is normal
-            } else if ($data['location']==SITEID && has_capability('moodle/course:managefiles', get_context_instance(CONTEXT_SYSTEM, SITEID))) {
+            } else if ($data['location']==SITEID && has_capability('moodle/course:managefiles', get_context_instance(CONTEXT_SYSTEM))) {
                 // admin can access site files
             } else {
                 // location is invalid or missing, so set to default

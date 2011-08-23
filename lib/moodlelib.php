@@ -263,6 +263,14 @@ define ('BLOG_GLOBAL_LEVEL', 5);
 //length of "varchar(255) / 3 (bytes / utf-8 character) = 85".
 define('TAG_MAX_LENGTH', 50); 
 
+/**
+ * Password policy constants
+ */
+define ('PASSWORD_LOWER', 'abcdefghijklmnopqrstuvwxyz');
+define ('PASSWORD_UPPER', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ');
+define ('PASSWORD_DIGITS', '0123456789');
+define ('PASSWORD_NONALPHANUM', '.,;:!?_-+/*@#&$');
+
 if (!defined('SORT_LOCALE_STRING')) { // PHP < 4.4.0 - TODO: remove in 2.0
     define('SORT_LOCALE_STRING', SORT_STRING);
 }
@@ -1068,6 +1076,11 @@ function get_user_preferences($name=NULL, $default=NULL, $otheruserid=NULL) {
  */
 function make_timestamp($year, $month=1, $day=1, $hour=0, $minute=0, $second=0, $timezone=99, $applydst=true) {
 
+    $strtimezone = NULL;
+    if (!is_numeric($timezone)) {
+        $strtimezone = $timezone;
+    }
+
     $timezone = get_user_timezone_offset($timezone);
 
     if (abs($timezone) > 13) {
@@ -1076,7 +1089,7 @@ function make_timestamp($year, $month=1, $day=1, $hour=0, $minute=0, $second=0, 
         $time = gmmktime((int)$hour, (int)$minute, (int)$second, (int)$month, (int)$day, (int)$year);
         $time = usertime($time, $timezone);
         if($applydst) {
-            $time -= dst_offset_on($time);
+            $time -= dst_offset_on($time, $strtimezone);
         }
     }
 
@@ -1172,6 +1185,11 @@ function userdate($date, $format='', $timezone=99, $fixday = true) {
 
     global $CFG;
 
+    $strtimezone = NULL;
+    if (!is_numeric($timezone)) {
+        $strtimezone = $timezone;
+    }
+
     if (empty($format)) {
         $format = get_string('strftimedaydatetime');
     }
@@ -1183,7 +1201,7 @@ function userdate($date, $format='', $timezone=99, $fixday = true) {
         $fixday = ($formatnoday != $format);
     }
 
-    $date += dst_offset_on($date);
+    $date += dst_offset_on($date, $strtimezone);
 
     $timezone = get_user_timezone_offset($timezone);
 
@@ -1231,6 +1249,11 @@ function userdate($date, $format='', $timezone=99, $fixday = true) {
  */
 function usergetdate($time, $timezone=99) {
 
+    $strtimezone = NULL;
+    if (!is_numeric($timezone)) {
+        $strtimezone = $timezone;
+    }
+
     $timezone = get_user_timezone_offset($timezone);
 
     if (abs($timezone) > 13) {    // Server time
@@ -1238,7 +1261,7 @@ function usergetdate($time, $timezone=99) {
     }
 
     // There is no gmgetdate so we use gmdate instead
-    $time += dst_offset_on($time);
+    $time += dst_offset_on($time, $strtimezone);
     $time += intval((float)$timezone * HOURSECS);
 
     $datestring = gmstrftime('%S_%M_%H_%d_%m_%Y_%w_%j_%A_%B', $time);
@@ -1288,7 +1311,6 @@ function usertime($date, $timezone=99) {
  */
 function usergetmidnight($date, $timezone=99) {
 
-    $timezone = get_user_timezone_offset($timezone);
     $userdate = usergetdate($date, $timezone);
 
     // Time of midnight of this user's day, in GMT
@@ -1402,7 +1424,7 @@ function get_user_timezone($tz = 99) {
 
     $tz = 99;
 
-    while(($tz == '' || $tz == 99) && $next = each($timezones)) {
+    while(($tz == '' || $tz == 99 || $tz == NULL) && $next = each($timezones)) {
         $tz = $next['value'];
     }
 
@@ -1442,10 +1464,10 @@ function get_timezone_record($timezonename) {
  * @param ? $to_year ?
  * @return bool
  */
-function calculate_user_dst_table($from_year = NULL, $to_year = NULL) {
+function calculate_user_dst_table($from_year = NULL, $to_year = NULL, $strtimezone = NULL) {
     global $CFG, $SESSION;
 
-    $usertz = get_user_timezone();
+    $usertz = get_user_timezone($strtimezone);
 
     if (is_float($usertz)) {
         // Trivial timezone, no DST
@@ -1590,10 +1612,10 @@ function dst_changes_for_year($year, $timezone) {
 }
 
 // $time must NOT be compensated at all, it has to be a pure timestamp
-function dst_offset_on($time) {
+function dst_offset_on($time, $strtimezone = NULL) {
     global $SESSION;
 
-    if(!calculate_user_dst_table() || empty($SESSION->dst_offsets)) {
+    if(!calculate_user_dst_table(NULL, NULL, $strtimezone) || empty($SESSION->dst_offsets)) {
         return 0;
     }
 
@@ -1618,16 +1640,16 @@ function dst_offset_on($time) {
         if($SESSION->dst_range[0] == 1971) {
             return 0;
         }
-        calculate_user_dst_table($SESSION->dst_range[0] - 5, NULL);
-        return dst_offset_on($time);
+        calculate_user_dst_table($SESSION->dst_range[0] - 5, NULL, $strtimezone);
+        return dst_offset_on($time, $strtimezone);
     }
     else {
         // We need a year larger than $SESSION->dst_range[1]
         if($SESSION->dst_range[1] == 2035) {
             return 0;
         }
-        calculate_user_dst_table(NULL, $SESSION->dst_range[1] + 5);
-        return dst_offset_on($time);
+        calculate_user_dst_table(NULL, $SESSION->dst_range[1] + 5, $strtimezone);
+        return dst_offset_on($time, $strtimezone);
     }
 }
 
@@ -1821,8 +1843,11 @@ function course_setup($courseorid=0) {
  * @param mixed $courseorid id of the course or course object
  * @param bool $autologinguest
  * @param object $cm course module object
+ * @param bool $setwantsurltome Define if we want to set $SESSION->wantsurl, defaults to
+ *             true. Used to avoid (=false) some scripts (file.php...) to set that variable,
+ *             in order to keep redirects working properly. MDL-14495
  */
-function require_login($courseorid=0, $autologinguest=true, $cm=null) {
+function require_login($courseorid=0, $autologinguest=true, $cm=null, $setwantsurltome=true) {
 
     global $CFG, $SESSION, $USER, $COURSE, $FULLME;
 
@@ -1833,7 +1858,9 @@ function require_login($courseorid=0, $autologinguest=true, $cm=null) {
     if (!isloggedin()) {
         //NOTE: $USER->site check was obsoleted by session test cookie,
         //      $USER->confirmed test is in login/index.php
-        $SESSION->wantsurl = $FULLME;
+        if ($setwantsurltome) {
+            $SESSION->wantsurl = $FULLME;
+        }
         if (!empty($_SERVER['HTTP_REFERER'])) {
             $SESSION->fromurl  = $_SERVER['HTTP_REFERER'];
         }
@@ -1860,7 +1887,6 @@ function require_login($courseorid=0, $autologinguest=true, $cm=null) {
         }
     }
 
-
 /// check whether the user should be changing password (but only if it is REALLY them)
     if (get_user_preferences('auth_forcepasswordchange') && empty($USER->realuser)) {
         $userauth = get_auth_plugin($USER->auth);
@@ -1879,7 +1905,7 @@ function require_login($courseorid=0, $autologinguest=true, $cm=null) {
                 }
             }
         } else {
-            error(get_string('nopasswordchangeforced', 'auth'));
+            print_error('nopasswordchangeforced', 'auth');
         }
     }
 
@@ -1892,7 +1918,7 @@ function require_login($courseorid=0, $autologinguest=true, $cm=null) {
 /// Make sure current IP matches the one for this session (if required)
     if (!empty($CFG->tracksessionip)) {
         if ($USER->sessionIP != md5(getremoteaddr())) {
-            error(get_string('sessionipnomatch', 'error'));
+            print_error('sessionipnomatch', 'error');
         }
     }
 
@@ -1921,7 +1947,7 @@ function require_login($courseorid=0, $autologinguest=true, $cm=null) {
 /// groupmembersonly access control
     if (!empty($CFG->enablegroupings) and $cm and $cm->groupmembersonly and !has_capability('moodle/site:accessallgroups', get_context_instance(CONTEXT_MODULE, $cm->id))) {
         if (isguestuser() or !groups_has_membership($cm)) {
-            error(get_string('groupmembersonlyerror', 'group'), $CFG->wwwroot.'/course/view.php?id='.$cm->course);
+            print_error('groupmembersonlyerror', 'group', $CFG->wwwroot.'/course/view.php?id='.$cm->course);
         }
     }
 
@@ -1937,6 +1963,7 @@ function require_login($courseorid=0, $autologinguest=true, $cm=null) {
             && !has_capability('moodle/course:viewhiddenactivities', $COURSE->context)) {
             redirect($CFG->wwwroot, get_string('activityiscurrentlyhidden'));
         }
+        user_accesstime_log($COURSE->id); /// Access granted, update lastaccess times
         return;
 
     } else {
@@ -1944,24 +1971,16 @@ function require_login($courseorid=0, $autologinguest=true, $cm=null) {
         /// Check if the user can be in a particular course
         if (empty($USER->access['rsw'][$COURSE->context->path])) {
             //
-            // Spaghetti logic construct
-            // 
-            // - able to view course?
-            // - able to view category?
-            // => if either is missing, course is hidden from this user
+            // MDL-13900 - If the course or the parent category are hidden
+            // and the user hasn't the 'course:viewhiddencourses' capability, prevent access
             //
-            // It's carefully ordered so we run the cheap checks first, and the
-            // more costly checks last...
-            //
-            if (! (($COURSE->visible || has_capability('moodle/course:viewhiddencourses', $COURSE->context))
-                   && (course_parent_visible($COURSE)) || has_capability('moodle/course:viewhiddencourses', 
-                                                                        get_context_instance(CONTEXT_COURSECAT,
-                                                                                             $COURSE->category)))) {
+            if ( !($COURSE->visible && course_parent_visible($COURSE)) &&
+                   !has_capability('moodle/course:viewhiddencourses', $COURSE->context)) {
                 print_header_simple();
                 notice(get_string('coursehidden'), $CFG->wwwroot .'/');
             }
-        }    
-        
+        }
+
     /// Non-guests who don't currently have access, check if they can be allowed in as a guest
 
         if ($USER->username != 'guest' and !has_capability('moodle/course:view', $COURSE->context)) {
@@ -1976,6 +1995,7 @@ function require_login($courseorid=0, $autologinguest=true, $cm=null) {
         if (has_capability('moodle/legacy:guest', $COURSE->context, NULL, false)) {
             if (has_capability('moodle/site:doanything', $sysctx)) {
                 // administrators must be able to access any course - even if somebody gives them guest access
+                user_accesstime_log($COURSE->id); /// Access granted, update lastaccess times
                 return;
             }
 
@@ -1991,12 +2011,14 @@ function require_login($courseorid=0, $autologinguest=true, $cm=null) {
                                  get_string('activityiscurrentlyhidden'));
                     }
 
+                    user_accesstime_log($COURSE->id); /// Access granted, update lastaccess times
                     return;   // User is allowed to see this course
 
                     break;
 
                 case 2:    /// Guests allowed with key
                     if (!empty($USER->enrolkey[$COURSE->id])) {   // Set by enrol/manual/enrol.php
+                        user_accesstime_log($COURSE->id); /// Access granted, update lastaccess times
                         return true;
                     }
                     //  otherwise drop through to logic below (--> enrol.php)
@@ -2032,6 +2054,7 @@ function require_login($courseorid=0, $autologinguest=true, $cm=null) {
             if (!empty($cm) and !$cm->visible and !has_capability('moodle/course:viewhiddenactivities', $COURSE->context)) { 
                 redirect($CFG->wwwroot.'/course/view.php?id='.$cm->course, get_string('activityiscurrentlyhidden'));
             }
+            user_accesstime_log($COURSE->id); /// Access granted, update lastaccess times
             return;   // User is allowed to see this course
 
         }
@@ -2102,25 +2125,29 @@ function require_logout() {
  * @param mixed $courseorid The course object or id in question
  * @param bool $autologinguest Allow autologin guests if that is wanted
  * @param object $cm Course activity module if known
+ * @param bool $setwantsurltome Define if we want to set $SESSION->wantsurl, defaults to
+ *             true. Used to avoid (=false) some scripts (file.php...) to set that variable,
+ *             in order to keep redirects working properly. MDL-14495
  */
-function require_course_login($courseorid, $autologinguest=true, $cm=null) {
+function require_course_login($courseorid, $autologinguest=true, $cm=null, $setwantsurltome=true) {
     global $CFG;
     if (!empty($CFG->forcelogin)) {
         // login required for both SITE and courses
-        require_login($courseorid, $autologinguest, $cm);
+        require_login($courseorid, $autologinguest, $cm, $setwantsurltome);
 
     } else if (!empty($cm) and !$cm->visible) {
         // always login for hidden activities
-        require_login($courseorid, $autologinguest, $cm);
+        require_login($courseorid, $autologinguest, $cm, $setwantsurltome);
 
     } else if ((is_object($courseorid) and $courseorid->id == SITEID)
           or (!is_object($courseorid) and $courseorid == SITEID)) {
         //login for SITE not required
+        user_accesstime_log(SITEID);
         return;
 
     } else {
         // course login always required
-        require_login($courseorid, $autologinguest, $cm);
+        require_login($courseorid, $autologinguest, $cm, $setwantsurltome);
     }
 }
 
@@ -2315,7 +2342,7 @@ function update_login_count() {
 
     if ($SESSION->logincount > $max_logins) {
         unset($SESSION->wantsurl);
-        error(get_string('errortoomanylogins'));
+        print_error('errortoomanylogins');
     }
 }
 
@@ -2894,7 +2921,7 @@ function truncate_userinfo($info) {
     // define the limits
     $limit = array(
                     'username'    => 100,
-                    'idnumber'    =>  64,
+                    'idnumber'    => 255,
                     'firstname'   => 100,
                     'lastname'    => 100,
                     'email'       => 100,
@@ -2947,6 +2974,9 @@ function delete_user($user) {
 
     // now do a final accesslib cleanup - removes all role assingments in user context and context itself
     delete_context(CONTEXT_USER, $user->id);
+
+    require_once($CFG->dirroot.'/tag/lib.php');
+    tag_set('user', $user->id, array());
 
     // workaround for bulk deletes of users with the same email address
     $delname = addslashes("$user->email.".time());
@@ -3144,7 +3174,7 @@ function complete_user_login($user) {
                 redirect($CFG->httpswwwroot.'/login/change_password.php');
             }
         } else {
-            error(get_string('nopasswordchangeforced', 'auth'));
+            print_error('nopasswordchangeforced', 'auth');
         }
     }
     return $USER;
@@ -3282,6 +3312,8 @@ function get_complete_user_data($field, $value, $mnethostid=null) {
 
     $user->preference = get_user_preferences(null, null, $user->id);
 
+    $user->lastcourseaccess    = array(); // during last session
+    $user->currentcourseaccess = array(); // during current session
     if ($lastaccesses = get_records('user_lastaccess', 'userid', $user->id)) {
         foreach ($lastaccesses as $lastaccess) {
             $user->lastcourseaccess[$lastaccess->courseid] = $lastaccess->timeaccess;
@@ -3991,10 +4023,11 @@ function &get_mailer($action='get') {
  * @param string $attachname the name of the file (extension indicates MIME)
  * @param bool $usetrueaddress determines whether $from email address should
  *          be sent out. Will be overruled by user profile setting for maildisplay
+ * @param int $wordwrapwidth custom word wrap width
  * @return bool|string Returns "true" if mail was sent OK, "emailstop" if email
  *          was blocked by user and "false" if there was another sort of error.
  */
-function email_to_user($user, $from, $subject, $messagetext, $messagehtml='', $attachment='', $attachname='', $usetrueaddress=true, $replyto='', $replytoname='') {
+function email_to_user($user, $from, $subject, $messagetext, $messagehtml='', $attachment='', $attachname='', $usetrueaddress=true, $replyto='', $replytoname='', $wordwrapwidth=79) {
 
     global $CFG, $FULLME;
 
@@ -4062,7 +4095,7 @@ function email_to_user($user, $from, $subject, $messagetext, $messagehtml='', $a
 
     $mail->AddAddress($user->email, fullname($user) );
 
-    $mail->WordWrap = 79;                               // set word wrap
+    $mail->WordWrap = $wordwrapwidth;                   // set word wrap
 
     if (!empty($from->customheaders)) {                 // Add custom headers
         if (is_array($from->customheaders)) {
@@ -5129,7 +5162,7 @@ function get_string($identifier, $module='', $a=NULL, $extralocations=NULL) {
                             'parentlanguage', 'strftimedate', 'strftimedateshort', 'strftimedatetime',
                             'strftimedaydate', 'strftimedaydatetime', 'strftimedayshort', 'strftimedaytime',
                             'strftimemonthyear', 'strftimerecent', 'strftimerecentfull', 'strftimetime',
-                            'thischarset', 'thisdirection', 'thislanguage');
+                            'thischarset', 'thisdirection', 'thislanguage', 'strftimedatetimeshort');
 
     $filetocheck = 'langconfig.php';
     $defaultlang = 'en_utf8';
@@ -5692,44 +5725,6 @@ function get_list_of_currencies() {
 }
 
 
-
-/**
- * Can include a given document file (depends on second
- * parameter) or just return info about it.
- *
- * @uses $CFG
- * @param string $file ?
- * @param bool $include ?
- * @return ?
- * @todo Finish documenting this function
- */
-function document_file($file, $include=true) {
-    global $CFG;
-
-    $file = clean_filename($file);
-
-    if (empty($file)) {
-        return false;
-    }
-
-    $langs = array(current_language(), get_string('parentlanguage'), 'en');
-
-    foreach ($langs as $lang) {
-        $info = new object();
-        $info->filepath = $CFG->dirroot .'/lang/'. $lang .'/docs/'. $file;
-        $info->urlpath  = $CFG->wwwroot .'/lang/'. $lang .'/docs/'. $file;
-
-        if (file_exists($info->filepath)) {
-            if ($include) {
-                include($info->filepath);
-            }
-            return $info;
-        }
-    }
-
-    return false;
-}
-
 /// ENCRYPTION  ////////////////////////////////////////////////
 
 /**
@@ -6165,7 +6160,7 @@ function ini_get_bool($ini_get_arg) {
  * Determines if the HTML editor is enabled.
  * @deprecated Use {@link can_use_html_editor()} instead.
  */
- function can_use_richtext_editor() {
+function can_use_richtext_editor() {
     return can_use_html_editor();
 }
 
@@ -6178,7 +6173,7 @@ function ini_get_bool($ini_get_arg) {
  * @return string|false Returns false if editor is not being used, otherwise
  * returns 'MSIE' or 'Gecko'.
  */
- function can_use_html_editor() {
+function can_use_html_editor() {
     global $USER, $CFG;
 
     if (!empty($USER->htmleditor) and !empty($CFG->htmleditor)) {
@@ -6209,7 +6204,7 @@ function check_gd_version() {
 
     } else {
         ob_start();
-        phpinfo(8);
+        phpinfo(INFO_MODULES);
         $phpinfo = ob_get_contents();
         ob_end_clean();
 
@@ -6662,23 +6657,61 @@ function getweek ($startdate, $thedate) {
 
 /**
  * returns a randomly generated password of length $maxlen.  inspired by
- * {@link http://www.phpbuilder.com/columns/jesus19990502.php3}
+ * {@link http://www.phpbuilder.com/columns/jesus19990502.php3} and
+ * {@link http://es2.php.net/manual/en/function.str-shuffle.php#73254}
  *
- * @param int $maxlength  The maximum size of the password being generated.
+ * @param int $maxlen  The maximum size of the password being generated.
  * @return string
  */
 function generate_password($maxlen=10) {
     global $CFG;
 
-    $fillers = '1234567890!$-+';
-    $wordlist = file($CFG->wordlist);
+    if (empty($CFG->passwordpolicy)) {
+        $fillers = PASSWORD_DIGITS;
+        $wordlist = file($CFG->wordlist);
+        $word1 = trim($wordlist[rand(0, count($wordlist) - 1)]);
+        $word2 = trim($wordlist[rand(0, count($wordlist) - 1)]);
+        $filler1 = $fillers[rand(0, strlen($fillers) - 1)];
+        $password = $word1 . $filler1 . $word2;
+    } else {
+        $maxlen = !empty($CFG->minpasswordlength) ? $CFG->minpasswordlength : 0;
+        $digits = $CFG->minpassworddigits;
+        $lower = $CFG->minpasswordlower;
+        $upper = $CFG->minpasswordupper;
+        $nonalphanum = $CFG->minpasswordnonalphanum;
+        $additional = $maxlen - ($lower + $upper + $digits + $nonalphanum);
 
-    srand((double) microtime() * 1000000);
-    $word1 = trim($wordlist[rand(0, count($wordlist) - 1)]);
-    $word2 = trim($wordlist[rand(0, count($wordlist) - 1)]);
-    $filler1 = $fillers[rand(0, strlen($fillers) - 1)];
+        // Make sure we have enough characters to fulfill
+        // complexity requirements
+        $passworddigits = PASSWORD_DIGITS;
+        while ($digits > strlen($passworddigits)) {
+            $passworddigits .= PASSWORD_DIGITS;
+        }
+        $passwordlower = PASSWORD_LOWER;
+        while ($lower > strlen($passwordlower)) {
+            $passwordlower .= PASSWORD_LOWER;
+        }
+        $passwordupper = PASSWORD_UPPER;
+        while ($upper > strlen($passwordupper)) {
+            $passwordupper .= PASSWORD_UPPER;
+        }
+        $passwordnonalphanum = PASSWORD_NONALPHANUM;
+        while ($nonalphanum > strlen($passwordnonalphanum)) {
+            $passwordnonalphanum .= PASSWORD_NONALPHANUM;
+        }
 
-    return substr($word1 . $filler1 . $word2, 0, $maxlen);
+        // Now mix and shuffle it all
+        $password = str_shuffle (substr(str_shuffle ($passwordlower), 0, $lower) .
+                                 substr(str_shuffle ($passwordupper), 0, $upper) .
+                                 substr(str_shuffle ($passworddigits), 0, $digits) .
+                                 substr(str_shuffle ($passwordnonalphanum), 0 , $nonalphanum) .
+                                 substr(str_shuffle ($passwordlower .
+                                                     $passwordupper .
+                                                     $passworddigits .
+                                                     $passwordnonalphanum), 0 , $additional));
+    }
+
+    return substr ($password, 0, $maxlen);
 }
 
 /**

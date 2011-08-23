@@ -352,8 +352,9 @@ class question_category_object {
     }
 
     function move_questions($oldcat, $newcat){
-        if (!set_field('question', 'category', $newcat, 'category', $oldcat)) {
-            error("Error while moving questions from category '$oldcat' to '$newcat'", $this->pageurl->out());
+        $questionids = get_records_select_menu('question', "category = $oldcat AND (parent = 0 OR parent = id)", '', 'id,1');
+        if (!question_move_questions_to_category(implode(',', array_keys($questionids)), $newcat)) {
+            print_error('errormovingquestions', 'question', $returnurl, $ids);
         }
     }
 
@@ -363,7 +364,7 @@ class question_category_object {
      */
     function add_category($newparent, $newcategory, $newinfo) {
         if (empty($newcategory)) {
-            error(get_string('categorynamecantbeblank', 'quiz'));
+            print_error('categorynamecantbeblank', 'quiz');
         }
         list($parentid, $contextid) = explode(',', $newparent);
         //moodle_form makes sure select element output is legal no need for further cleaning
@@ -396,7 +397,7 @@ class question_category_object {
     function update_category($updateid, $newparent, $newname, $newinfo) {
         global $CFG, $QTYPES;
         if (empty($newname)) {
-            error(get_string('categorynamecantbeblank', 'quiz'));
+            print_error('categorynamecantbeblank', 'quiz');
         }
 
         list($parentid, $tocontextid) = explode(',', $newparent);

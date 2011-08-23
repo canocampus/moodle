@@ -26,6 +26,12 @@
 define ('DATA_MAX_ENTRIES', 50);
 define ('DATA_PERPAGE_SINGLE', 1);
 
+define ('DATA_FIRSTNAME', -1);
+define ('DATA_LASTNAME', -2);
+define ('DATA_APPROVED', -3);
+define ('DATA_TIMEADDED', 0);
+define ('DATA_TIMEMODIFIED', -4);
+
 class data_field_base {     /// Base class for Database Field Types (see field/*/field.class.php)
 
     var $type = 'unknown';  /// Subclasses must override the type with their name
@@ -364,6 +370,9 @@ function data_generate_default_template(&$data, $template, $recordid=0, $form=fa
             $str .= '<tr><td align="center" colspan="2">##edit##  ##more##  ##delete##  ##approve##</td></tr>';
         } else if ($template == 'singletemplate') {
             $str .= '<tr><td align="center" colspan="2">##edit##  ##delete##  ##approve##</td></tr>';
+        } else if ($template == 'asearchtemplate') {
+            $str .= '<tr><td valign="top" align="right">'.get_string('authorfirstname', 'data').': </td><td>##firstname##</td></tr>';
+            $str .= '<tr><td valign="top" align="right">'.get_string('authorlastname', 'data').': </td><td>##lastname##</td></tr>';
         }
 
         $str .= '</table>';
@@ -641,6 +650,10 @@ function data_update_instance($data) {
 
     if (empty($data->assessed)) {
         $data->assessed = 0;
+    }
+
+    if (empty($data->notification)) {
+        $data->notification = 0;
     }
 
     if (! update_record('data', $data)) {
@@ -966,10 +979,16 @@ function data_print_template($template, $records, $data, $search='',$page=0, $re
         $patterns[]='##user##';
         $replacement[] = '<a href="'.$CFG->wwwroot.'/user/view.php?id='.$record->userid.
                                '&amp;course='.$data->course.'">'.fullname($record).'</a>';
+        
+        $patterns[] = '##timeadded##';
+        $replacement[] = userdate($record->timecreated); 
+
+        $patterns[] = '##timemodified##';
+        $replacement [] = userdate($record->timemodified);
 
         $patterns[]='##approve##';
         if (has_capability('mod/data:approve', $context) && ($data->approval) && (!$record->approved)){
-            $replacement[] = '<a href="'.$CFG->wwwroot.'/mod/data/view.php?d='.$data->id.'&amp;approve='.$record->id.'&amp;sesskey='.sesskey().'"><img src="'.$CFG->pixpath.'/i/approve.gif" class="iconsmall" alt="'.get_string('approve').'" /></a>';
+            $replacement[] = '<span class="approve"><a href="'.$CFG->wwwroot.'/mod/data/view.php?d='.$data->id.'&amp;approve='.$record->id.'&amp;sesskey='.sesskey().'"><img src="'.$CFG->pixpath.'/i/approve.gif" class="icon" alt="'.get_string('approve').'" /></a></span>';
         } else {
             $replacement[] = '';
         }
@@ -1051,15 +1070,35 @@ function data_print_preference_form($data, $perpage, $search, $sort='', $order='
     echo ';" >&nbsp;&nbsp;&nbsp;<label for="pref_search">'.get_string('search').'</label> <input type="text" size="16" name="search" id= "pref_search" value="'.s($search).'" /></div>';
     echo '&nbsp;&nbsp;&nbsp;<label for="pref_sortby">'.get_string('sortby').'</label> ';
     //foreach field, print the option
-    $fields = get_records('data_fields','dataid',$data->id, 'name');
-    echo '<select name="sort" id="pref_sortby"><option value="0">'.get_string('dateentered','data').'</option>';
-    foreach ($fields as $field) {
-        if ($field->id == $sort) {
-            echo '<option value="'.$field->id.'" selected="selected">'.$field->name.'</option>';
+    echo '<select name="sort" id="pref_sortby">';
+    if ($fields = get_records('data_fields','dataid',$data->id, 'name')) {
+        echo '<optgroup label="'.get_string('fields', 'data').'">';
+        foreach ($fields as $field) {
+            if ($field->id == $sort) {
+                echo '<option value="'.$field->id.'" selected="selected">'.$field->name.'</option>';
+            } else {
+                echo '<option value="'.$field->id.'">'.$field->name.'</option>';
+            }
+        }
+        echo '</optgroup>';
+    }
+    $options = array();
+    $options[DATA_TIMEADDED]    = get_string('timeadded', 'data');
+    $options[DATA_TIMEMODIFIED] = get_string('timemodified', 'data');
+    $options[DATA_FIRSTNAME]    = get_string('authorfirstname', 'data');
+    $options[DATA_LASTNAME]     = get_string('authorlastname', 'data');
+    if ($data->approval and has_capability('mod/data:approve', $context)) {
+        $options[DATA_APPROVED] = get_string('approved', 'data');
+    }
+    echo '<optgroup label="'.get_string('other', 'data').'">';
+    foreach ($options as $key => $name) {
+        if ($key == $sort) {
+            echo '<option value="'.$key.'" selected="selected">'.$name.'</option>';
         } else {
-            echo '<option value="'.$field->id.'">'.$field->name.'</option>';
+            echo '<option value="'.$key.'">'.$name.'</option>';
         }
     }
+    echo '</optgroup>';
     echo '</select>';
     echo '<label for="pref_order" class="accesshide">'.get_string('order').'</label>';
     echo '<select id="pref_order" name="order">';
@@ -1112,7 +1151,8 @@ function data_print_preference_form($data, $perpage, $search, $sort='', $order='
         //  End -->
         //]]>
         </script>';
-    echo '&nbsp;<input type="checkbox" name="advanced" value="1" '.$checked.' onchange="showHideAdvSearch(this.checked);" />'.get_string('advancedsearch', 'data');
+    echo '&nbsp;<input type="hidden" name="advanced" value="0" />';
+    echo '&nbsp;<input type="checkbox" id="advancedcheckbox" name="advanced" value="1" '.$checked.' onchange="showHideAdvSearch(this.checked);" /><label for="advancedcheckbox">'.get_string('advancedsearch', 'data').'</label>';
     echo '&nbsp;<input type="submit" value="'.get_string('savesettings','data').'" />';
     
     echo '<br />';
@@ -1163,16 +1203,23 @@ function data_print_preference_form($data, $perpage, $search, $sort='', $order='
     /// Then we generate strings to replace for normal tags
     foreach ($fields as $field) {
         $patterns[]='/\[\['.$field->field->name.'\]\]/i';
-        $searchfield = data_get_field_from_id($field->field->id, $data); 
+        $searchfield = data_get_field_from_id($field->field->id, $data);
         if (!empty($search_array[$field->field->id]->data)) {
             $replacement[] = $searchfield->display_search_field($search_array[$field->field->id]->data);
         } else {
             $replacement[] = $searchfield->display_search_field();
         }
     }
-    
+    $fn = !empty($search_array[DATA_FIRSTNAME]->data) ? $search_array[DATA_FIRSTNAME]->data : '';
+    $ln = !empty($search_array[DATA_LASTNAME]->data) ? $search_array[DATA_LASTNAME]->data : '';
+    $patterns[]    = '/##firstname##/';
+    $replacement[] = '<input type="text" size="16" name="u_fn" value="'.$fn.'" />';
+    $patterns[]    = '/##lastname##/';
+    $replacement[] = '<input type="text" size="16" name="u_ln" value="'.$ln.'" />';
+
     ///actual replacement of the tags
     $newtext = preg_replace($patterns, $replacement, $data->asearchtemplate);
+
     $options = new object();
     $options->para=false;
     $options->noclean=true;
@@ -1180,7 +1227,7 @@ function data_print_preference_form($data, $perpage, $search, $sort='', $order='
     echo format_text($newtext, FORMAT_HTML, $options);
     echo '</td></tr>';
 
-    echo '<tr><td colspan="4" style="text-align: center;"><br/><input type="submit" value="'.get_string('savesettings','data').'" /><input type="reset" value="'.get_string('resetsettings','data').'" /></td></tr>';
+    echo '<tr><td colspan="4" style="text-align: center;"><br/><input type="submit" value="'.get_string('savesettings','data').'" /><input type="submit" name="resetadv" value="'.get_string('resetsettings','data').'" /></td></tr>';
     echo '</table>';
     echo '</div>';
     echo '</div>';
@@ -1733,34 +1780,37 @@ function data_user_can_add_entry($data, $currentgroup, $groupmode) {
 
 function is_directory_a_preset($directory) {
     $directory = rtrim($directory, '/\\') . '/';
-    if (file_exists($directory.'singletemplate.html') &&
-            file_exists($directory.'listtemplate.html') &&
-            file_exists($directory.'listtemplateheader.html') &&
-            file_exists($directory.'listtemplatefooter.html') &&
-            file_exists($directory.'addtemplate.html') &&
-            file_exists($directory.'rsstemplate.html') &&
-            file_exists($directory.'rsstitletemplate.html') &&
-            file_exists($directory.'csstemplate.css') &&
-            file_exists($directory.'jstemplate.js') &&
-            file_exists($directory.'preset.xml')) return true;
-    else return false;
+    $status = file_exists($directory.'singletemplate.html') &&
+              file_exists($directory.'listtemplate.html') &&
+              file_exists($directory.'listtemplateheader.html') &&
+              file_exists($directory.'listtemplatefooter.html') &&
+              file_exists($directory.'addtemplate.html') &&
+              file_exists($directory.'rsstemplate.html') &&
+              file_exists($directory.'rsstitletemplate.html') &&
+              file_exists($directory.'csstemplate.css') &&
+              file_exists($directory.'jstemplate.js') &&
+              file_exists($directory.'preset.xml');
+
+    return $status;
 }
 
 
 function clean_preset($folder) {
-    if (@unlink($folder.'/singletemplate.html') &&
-        @unlink($folder.'/listtemplate.html') &&
-        @unlink($folder.'/listtemplateheader.html') &&
-        @unlink($folder.'/listtemplatefooter.html') &&
-        @unlink($folder.'/addtemplate.html') &&
-        @unlink($folder.'/rsstemplate.html') &&
-        @unlink($folder.'/rsstitletemplate.html') &&
-        @unlink($folder.'/csstemplate.css') &&
-        @unlink($folder.'/jstemplate.js') &&
-        @unlink($folder.'/preset.xml')) {
-        return true;
-    }
-    return false;
+    $status = @unlink($folder.'/singletemplate.html') &&
+              @unlink($folder.'/listtemplate.html') &&
+              @unlink($folder.'/listtemplateheader.html') &&
+              @unlink($folder.'/listtemplatefooter.html') &&
+              @unlink($folder.'/addtemplate.html') &&
+              @unlink($folder.'/rsstemplate.html') &&
+              @unlink($folder.'/rsstitletemplate.html') &&
+              @unlink($folder.'/csstemplate.css') &&
+              @unlink($folder.'/jstemplate.js') &&
+              @unlink($folder.'/preset.xml');
+
+    // optional
+    @unlink($folder.'/asearchtemplate.html');
+
+    return $status;
 }
 
 
@@ -1778,6 +1828,7 @@ function data_presets_export($course, $cm, $data) {
     $rsstitletemplate   = fopen($tempfolder.'/rsstitletemplate.html', 'w');
     $csstemplate        = fopen($tempfolder.'/csstemplate.css', 'w');
     $jstemplate         = fopen($tempfolder.'/jstemplate.js', 'w');
+    $asearchtemplate    = fopen($tempfolder.'/asearchtemplate.html', 'w');
 
     fwrite($singletemplate, $data->singletemplate);
     fwrite($listtemplate, $data->listtemplate);
@@ -1788,6 +1839,7 @@ function data_presets_export($course, $cm, $data) {
     fwrite($rsstitletemplate, $data->rsstitletemplate);
     fwrite($csstemplate, $data->csstemplate);
     fwrite($jstemplate, $data->jstemplate);
+    fwrite($asearchtemplate, $data->asearchtemplate);
 
     fclose($singletemplate);
     fclose($listtemplate);
@@ -1798,22 +1850,30 @@ function data_presets_export($course, $cm, $data) {
     fclose($rsstitletemplate);
     fclose($csstemplate);
     fclose($jstemplate);
+    fclose($asearchtemplate);
 
     /* All the display data is now done. Now assemble preset.xml */
     $fields = get_records('data_fields', 'dataid', $data->id);
     $presetfile = fopen($tempfolder.'/preset.xml', 'w');
     $presetxml = "<preset>\n\n";
 
-    /* Database settings first. Name not included? */
-    $settingssaved = array('intro', 'comments',
-            'requiredentries', 'requiredentriestoview', 'maxentries',
-            'rssarticles', 'approval', 'scale', 'assessed',
-            'defaultsort', 'defaultsortdir', 'editany');
+    // raw settings are not preprocessed during saving of presets
+    $raw_settings = array('intro', 'comments', 'requiredentries', 'requiredentriestoview',
+                          'maxentries', 'rssarticles', 'approval', 'defaultsortdir');
 
     $presetxml .= "<settings>\n";
-    foreach ($settingssaved as $setting) {
-        $presetxml .= "<$setting>".htmlentities($data->$setting)."</$setting>\n";
+    // first settings that do not require any conversion
+    foreach ($raw_settings as $setting) {
+        $presetxml .= "<$setting>".htmlspecialchars($data->$setting)."</$setting>\n";
     }
+
+    // now specific settings
+    if ($data->defaultsort > 0 and $sortfield = data_get_field_from_id($data->defaultsort, $data)) {
+        $presetxml .= "<defaultsort>".htmlspecialchars($sortfield->field->name)."</defaultsort>\n";
+    } else {
+        $presetxml .= "<defaultsort>0</defaultsort>\n";
+    }
+    // note: grading settings are not exported intentionally
     $presetxml .= "</settings>\n\n";
 
     /* Now for the fields. Grabs all settings that are non-empty */
@@ -1822,7 +1882,7 @@ function data_presets_export($course, $cm, $data) {
             $presetxml .= "<field>\n";
             foreach ($field as $key => $value) {
                 if ($value != '' && $key != 'id' && $key != 'dataid') {
-                    $presetxml .= "<$key>".htmlentities($value)."</$key>\n";
+                    $presetxml .= "<$key>".htmlspecialchars($value)."</$key>\n";
                 }
             }
             $presetxml .= "</field>\n\n";
@@ -1848,7 +1908,8 @@ function data_presets_export($course, $cm, $data) {
             'rsstitletemplate.html',
             'csstemplate.css',
             'jstemplate.js',
-            'preset.xml');
+            'preset.xml',
+            'asearchtemplate.html');
 
     foreach ($filelist as $key => $file) {
         $filelist[$key] = $tempfolder.'/'.$filelist[$key];
@@ -1883,13 +1944,23 @@ class PresetImporter {
 
         /* Grab XML */
         $presetxml = file_get_contents($this->folder.'/preset.xml');
-        $parsedxml = xmlize($presetxml);
+        $parsedxml = xmlize($presetxml, 0);
+
+        $allowed_settings = array('intro', 'comments', 'requiredentries', 'requiredentriestoview',
+                                  'maxentries', 'rssarticles', 'approval', 'defaultsortdir', 'defaultsort');
 
         /* First, do settings. Put in user friendly array. */
         $settingsarray = $parsedxml['preset']['#']['settings'][0]['#'];
         $settings = new StdClass();
 
         foreach ($settingsarray as $setting => $value) {
+            if (!is_array($value)) {
+                continue;
+            }
+            if (!in_array($setting, $allowed_settings)) {
+                // unsupported setting
+                continue;
+            }
             $settings->$setting = $value[0]['#'];
         }
 
@@ -1897,15 +1968,20 @@ class PresetImporter {
         $fieldsarray = $parsedxml['preset']['#']['field'];
         $fields = array();
         foreach ($fieldsarray as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
             $f = new StdClass();
             foreach ($field['#'] as $param => $value) {
-                $f->$param = $value[0]['#'];
+                if (!is_array($value)) {
+                    continue;
+                }
+                $f->$param = addslashes($value[0]['#']);
             }
             $f->dataid = $this->data->id;
             $f->type = clean_param($f->type, PARAM_ALPHA);
             $fields[] = $f;
         }
-
         /* Now add the HTML templates to the settings array so we can update d */
         $settings->singletemplate     = file_get_contents($this->folder."/singletemplate.html");
         $settings->listtemplate       = file_get_contents($this->folder."/listtemplate.html");
@@ -1917,12 +1993,20 @@ class PresetImporter {
         $settings->csstemplate        = file_get_contents($this->folder."/csstemplate.css");
         $settings->jstemplate         = file_get_contents($this->folder."/jstemplate.js");
 
+        //optional
+        if (file_exists($this->folder."/asearchtemplate.html")) {
+            $settings->asearchtemplate = file_get_contents($this->folder."/asearchtemplate.html");
+        } else {
+            $settings->asearchtemplate =  NULL;
+        }
+
         $settings->instance = $this->data->id;
 
         /* Now we look at the current structure (if any) to work out whether we need to clear db
            or save the data */
-        $currentfields = array();
-        $currentfields = get_records('data_fields', 'dataid', $this->data->id);
+        if (!$currentfields = get_records('data_fields', 'dataid', $this->data->id)) {
+            $currentfields = array();
+        }
 
         return array($settings, $fields, $currentfields);
     }
@@ -1942,8 +2026,8 @@ class PresetImporter {
 
         list($settings, $newfields,  $currentfields) = $this->get_settings();
 
-        echo '<div style="text-align:center"><form action="preset.php" method="post">';
-        echo '<fieldset class="invisiblefieldset">';
+        echo '<div class="presetmapping"><form action="preset.php" method="post">';
+        echo '<div>';
         echo '<input type="hidden" name="action" value="finishimport" />';
         echo '<input type="hidden" name="sesskey" value="'.sesskey().'" />';
         echo '<input type="hidden" name="d" value="'.$this->data->id.'" />';
@@ -1966,7 +2050,7 @@ class PresetImporter {
                             $selected=true;
                         }
                         else {
-                            echo '<option value="$cid">'.$currentfield->name.'</option>';
+                            echo '<option value="'.$cid.'">'.$currentfield->name.'</option>';
                         }
                     }
                 }
@@ -1979,11 +2063,15 @@ class PresetImporter {
             }
             echo '</table>';
             echo "<p>$strwarning</p>";
-        }
-        else if (empty($newfields)) {
+
+        } else if (empty($newfields)) {
             error("New preset has no defined fields!");
         }
-        echo '<input type="submit" value="'.$strcontinue.'" /></fieldset></form></div>';
+
+        echo '<div class="overwritesettings"><label for="overwritesettings">'.get_string('overwritesettings', 'data').'</label>';
+        echo '<input id="overwritesettings" name="overwritesettings" type="checkbox" /></label></div>';
+
+        echo '<input class="button" type="submit" value="'.$strcontinue.'" /></div></form></div>';
 
     }
 
@@ -1992,6 +2080,8 @@ class PresetImporter {
 
         list($settings, $newfields, $currentfields) = $this->get_settings();
         $preservedfields = array();
+
+        $overwritesettings = optional_param('overwritesettings', 0, PARAM_BOOL);
 
         /* Maps fields and makes new ones */
         if (!empty($newfields)) {
@@ -2057,16 +2147,43 @@ class PresetImporter {
             }
         }
 
-        // existing valuas MUST be sent too - it can not work without them!
+    /// handle special settings here
+        if (!empty($settings->defaultsort)) {
+            if (is_numeric($settings->defaultsort)) {
+                //old broken value
+                $settings->defaultsort = 0;
+            } else {
+                $settings->defaultsort = (int)get_field('data_fields', 'id', 'dataid', $this->data->id, 'name', addslashes($settings->defaultsort));
+            }
+        } else {
+            $settings->defaultsort = 0;
+        }
+
+        // do we want to overwrite all current database settings?
+        if ($overwritesettings) {
+            // all supported settings
+            $overwrite = array_keys((array)$settings);
+        } else {
+            // only templates and sorting
+            $overwrite = array('singletemplate', 'listtemplate', 'listtemplateheader', 'listtemplatefooter',
+                               'addtemplate', 'rsstemplate', 'rsstitletemplate', 'csstemplate', 'jstemplate',
+                               'asearchtemplate', 'defaultsortdir', 'defaultsort');
+        }
+
+        // now overwrite current data settings
         foreach ($this->data as $prop=>$unused) {
-            if (array_key_exists($prop, (array)$settings)) {
+            if (in_array($prop, $overwrite)) {
                 $this->data->$prop = $settings->$prop;
             }
         }
 
         data_update_instance(addslashes_object($this->data));
 
-        if (strstr($this->folder, '/temp/')) clean_preset($this->folder); /* Removes the temporary files */
+        if (strstr($this->folder, '/temp/')) {
+        // Removes the temporary files
+            clean_preset($this->folder); 
+        }
+
         return true;
     }
 }

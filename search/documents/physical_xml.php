@@ -1,21 +1,34 @@
 <?php
 /**
 * Global Search Engine for Moodle
-* add-on 1.8+ : Valery Fremaux [valery.fremaux@club-internet.fr] 
-* 2007/08/02
+*
+* @package search
+* @category core
+* @subpackage document_wrappers
+* @author Valery Fremaux [valery.fremaux@club-internet.fr] > 1.8
+* @date 2008/03/31
+* @license http://www.gnu.org/copyleft/gpl.html GNU Public License
 *
 * this is a format handler for getting text out of a proprietary binary format 
 * so it can be indexed by Lucene search engine
 */
 
-function get_text_for_indexing_xml(&$resource){
+/**
+* @param object $resource
+* @uses CFG, USER
+*/
+function get_text_for_indexing_xml(&$resource, $directfile = ''){
     global $CFG, $USER;
     
     // SECURITY : do not allow non admin execute anything on system !!
     if (!isadmin($USER->id)) return;
 
     // just get text
-    $text = implode('', file("{$CFG->dataroot}/{$resource->course}/($resource->reference)"));
+    if ($directfile == ''){
+        $text = implode('', file("{$CFG->dataroot}/{$resource->course}/{$resource->reference}"));
+    } else {
+        $text = implode('', file("{$CFG->dataroot}/{$directfile}"));
+    }
 
     // filter out all xml tags
     $text = preg_replace("/<[^>]*>/", ' ', $text);

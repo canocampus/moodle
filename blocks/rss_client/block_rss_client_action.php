@@ -27,7 +27,7 @@ if (isset($_SERVER['HTTP_REFERER'])) {
 
 // Ensure that the logged in user is not using the guest account
 if (isguest()) {
-    error(get_string('noguestpost', 'forum'), $referrer);
+    print_error('noguestpost', 'forum', $referrer);
 }
 
 
@@ -63,7 +63,7 @@ if (!empty($id)) {
         $context = get_context_instance(CONTEXT_COURSE, $id);
     }
 } else {
-    $context = get_context_instance(CONTEXT_SYSTEM, SITEID);
+    $context = get_context_instance(CONTEXT_SYSTEM);
 }
 
 
@@ -102,6 +102,7 @@ if ($act == 'updfeed') {
         error(get_string('noguestpost', 'forum').
                 ' You are not allowed to make modifications to this RSS feed at this time.',
                 $referrer);
+        //print_error('noguestpost', 'forum', $referrer, 'You are not allowed to make modifications to this RSS feed at this time.');
     }
 
 
@@ -225,6 +226,7 @@ if ($act == 'updfeed') {
         error(get_string('noguestpost', 'forum').
                 ' You are not allowed to make modifications to this RSS feed at this time.',
                 $referrer);
+        //print_error('noguestpost', 'forum', $referrer, 'You are not allowed to make modifications to this RSS feed at this time.');
     }
 
     $file = $CFG->dataroot .'/cache/rsscache/'. $rssid .'.xml';

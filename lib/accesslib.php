@@ -43,10 +43,9 @@
  * What courses has this user access to?
  * - get_user_courses_bycap()
  *
- * What users can do X in this course or context?
- * - get_context_users_bycap()
- * - get_context_users_byrole()
- * 
+ * What users can do X in this context?
+ * - get_users_by_capability()
+ *
  * Enrol/unenrol
  * - enrol_into_course()
  * - role_assign()/role_unassign()
@@ -150,6 +149,11 @@ define('RISK_CONFIG',      0x0002);
 define('RISK_XSS',         0x0004);
 define('RISK_PERSONAL',    0x0008);
 define('RISK_SPAM',        0x0010);
+
+// rolename displays
+define('ROLENAME_ORIGINAL', 0);// the name as defined in the role definition
+define('ROLENAME_ALIAS', 1);   // the name as defined by a role alias 
+define('ROLENAME_BOTH', 2);    // Both, like this:  Role alias (Original)
 
 require_once($CFG->dirroot.'/group/lib.php');
 
@@ -1038,182 +1042,6 @@ function get_user_courses_bycap($userid, $cap, $accessdata, $doanything, $sort='
     return $courses;
 }
 
-/**
- * Draft - use for the course participants list page 
- *
- * Uses 1 DB query (cheap too - 2~7ms).
- *
- * TODO:
- * - implement additional where clauses
- * - sorting
- * - get course participants list to use it!
- *
- * returns a users array, both sorted _and_ keyed
- * on id (as get_my_courses() does)
- *
- * as a bonus, every user record comes with its own
- * personal context, as our callers need it straight away
- * {save 1 dbquery per user! yay!}
- *
- */
-function get_context_users_byrole ($context, $roleid, $fields=NULL, $where=NULL, $sort=NULL, $limit=0) {
-
-    global $CFG;
-    // Slim base fields, let callers ask for what they need...
-    $basefields = array('id', 'username');
-
-    if (!is_null($fields)) {
-        $fields = array_merge($basefields, $fields);
-        $fields = array_unique($fields);
-    } else {
-        $fields = $basefields;
-    }
-    $userfields = 'u.' .implode(',u.', $fields);
-
-    $contexts = substr($context->path, 1); // kill leading slash
-    $contexts = str_replace('/', ',', $contexts);
-
-    $sql = "SELECT $userfields,
-                   ctx.id AS ctxid, ctx.path AS ctxpath,
-                   ctx.depth AS ctxdepth, ctx.contextlevel AS ctxlevel
-            FROM {$CFG->prefix}user u
-            JOIN {$CFG->prefix}context ctx 
-              ON (u.id=ctx.instanceid AND ctx.contextlevel=".CONTEXT_USER.")
-            JOIN {$CFG->prefix}role_assignments ra
-              ON u.id = ra.userid
-            WHERE ra.roleid = $roleid 
-                  AND ra.contextid IN ($contexts)";
-
-    $rs = get_recordset_sql($sql);
-    
-    $users = array();
-    $cc = 0; // keep count
-    while ($u = rs_fetch_next_record($rs)) {
-        // build the context obj
-        $u = make_context_subobj($u);
-
-        $users[] = $u;
-        if ($limit > 0 && $cc++ > $limit) {
-            break;
-        }
-    }
-    rs_close($rs);
-    return $users;
-}
-
-/**
- * Draft - use for the course participants list page 
- *
- * Uses 2 fast DB queries
- *
- * TODO:
- * - automagically exclude roles that can-doanything sitewide (See callers)
- *   - perhaps also allow sitewide do-anything via flag
- * - implement additional where clauses
- * - sorting
- * - get course participants list to use it!
- *
- * returns a users array, both sorted _and_ keyed
- * on id (as get_my_courses() does)
- *
- * as a bonus, every user record comes with its own
- * personal context, as our callers need it straight away
- * {save 1 dbquery per user! yay!}
- *
- */
-function get_context_users_bycap ($context, $capability='moodle/course:view', $fields=NULL, $where=NULL, $sort=NULL, $limit=0) {
-    global $CFG;
-
-    // Plan
-    // 
-    // - Get all the *interesting* roles -- those that
-    //   have some rolecap entry in our ctx.path contexts
-    //
-    // - Get all RAs for any of those roles in any of our 
-    //   interesting contexts, with userid & perm data
-    //   in a nice (per user?) order
-    // 
-    // - Walk the resultset, computing the permissions
-    //   - actually - this is all a SQL subselect
-    // 
-    // - Fetch user records against the subselect
-    //
-
-    // Slim base fields, let callers ask for what they need...
-    $basefields = array('id', 'username');
-
-    if (!is_null($fields)) {
-        $fields = array_merge($basefields, $fields);
-        $fields = array_unique($fields);
-    } else {
-        $fields = $basefields;
-    }
-    $userfields = 'u.' .implode(',u.', $fields);
-
-    $contexts = substr($context->path, 1); // kill leading slash
-    $contexts = str_replace('/', ',', $contexts);
-
-    $roles = array();
-    $sql = "SELECT DISTINCT rc.roleid
-            FROM {$CFG->prefix}role_capabilities rc
-            WHERE rc.capability = '$capability'
-                  AND rc.contextid IN ($contexts)";
-    $rs = get_recordset_sql($sql);
-    while ($u = rs_fetch_next_record($rs)) {
-        $roles[] = $u->roleid;
-    }
-    rs_close($rs);
-    $roles = implode(',', $roles);
-
-    if (empty($roles)) {
-        return array();
-    }
-
-    //
-    // User permissions subselect SQL
-    //
-    // - the open join condition to
-    //   role_capabilities
-    //
-    // - because both rc and ra entries are
-    //   _at or above_ our context, we don't care
-    //   about their depth, we just need to sum them
-    // 
-    $sql = "SELECT ra.userid, SUM(rc.permission) AS permission
-            FROM {$CFG->prefix}role_assignments ra
-            JOIN {$CFG->prefix}role_capabilities rc
-              ON (ra.roleid = rc.roleid AND rc.contextid IN ($contexts))
-            WHERE     ra.contextid  IN ($contexts)
-                  AND ra.roleid IN ($roles)
-            GROUP BY ra.userid";
-
-    // Get users
-    $sql = "SELECT $userfields,
-                   ctx.id AS ctxid, ctx.path AS ctxpath,
-                   ctx.depth AS ctxdepth, ctx.contextlevel AS ctxlevel
-            FROM {$CFG->prefix}user u
-            JOIN {$CFG->prefix}context ctx 
-              ON (u.id=ctx.instanceid AND ctx.contextlevel=".CONTEXT_USER.")
-            JOIN ($sql) up
-              ON u.id = up.userid
-            WHERE up.permission > 0 AND u.username != 'guest'";
-
-    $rs = get_recordset_sql($sql);
-    
-    $users = array();
-    $cc = 0; // keep count
-    while ($u = rs_fetch_next_record($rs)) {
-        // build the context obj
-        $u = make_context_subobj($u);
-
-        $users[] = $u;
-        if ($limit > 0 && $cc++ > $limit) {
-            break;
-        }
-    }
-    rs_close($rs);
-    return $users;
-}
 
 /**
  * It will return a nested array showing role assignments
@@ -1965,9 +1793,9 @@ function moodle_install_roles() {
                 }
 
                 if ($teacher->editall) { // editting teacher
-                    role_assign($editteacherrole, $teacher->userid, 0, $coursecontext->id, 0, 0, $hiddenteacher);
+                    role_assign($editteacherrole, $teacher->userid, 0, $coursecontext->id, $teacher->timestart, $teacher->timeend, $hiddenteacher, $teacher->enrol, $teacher->timemodified);
                 } else {
-                    role_assign($noneditteacherrole, $teacher->userid, 0, $coursecontext->id, 0, 0, $hiddenteacher);
+                    role_assign($noneditteacherrole, $teacher->userid, 0, $coursecontext->id, $teacher->timestart, $teacher->timeend, $hiddenteacher, $teacher->enrol, $teacher->timemodified);
                 }
                 $progresscount++;
                 print_progress($progresscount, $totalcount, 5, 1, 'Processing role assignments');
@@ -1991,7 +1819,7 @@ function moodle_install_roles() {
 
                 // assign the default student role
                 $coursecontext = get_context_instance(CONTEXT_COURSE, $student->course);
-                role_assign($studentrole, $student->userid, 0, $coursecontext->id);
+                role_assign($studentrole, $student->userid, 0, $coursecontext->id, $student->timestart, $student->timeend, 0, $student->enrol, $student->time);
                 $progresscount++;
                 print_progress($progresscount, $totalcount, 5, 1, 'Processing role assignments');
             }
@@ -3722,6 +3550,20 @@ function get_parent_contexts($context) {
     return array_reverse($parentcontexts);
 }
 
+/**
+ * Return the id of the parent of this context, or false if there is no parent (only happens if this
+ * is the site context.)
+ *
+ * @param object $context
+ * @return integer the id of the parent context.
+ */
+function get_parent_contextid($context) {
+    $parentcontexts = get_parent_contexts($context);
+    if (count($parentcontexts) == 0) {
+        return false; 
+    }
+    return array_shift($parentcontexts);
+}
 
 /**
  * Recursive function which, given a context, find all its children context ids.
@@ -4182,7 +4024,7 @@ function allow_assign($sroleid, $troleid) {
  * @param string $field
  * @return array
  */
-function get_assignable_roles ($context, $field="name") {
+function get_assignable_roles ($context, $field='name', $rolenamedisplay=ROLENAME_ALIAS) {
 
     global $CFG;
 
@@ -4200,24 +4042,15 @@ function get_assignable_roles ($context, $field="name") {
 
     $roleids = implode(',',$roleids);
 
-    // apply context role aliases if name requested
-    if ($field == 'name') {
-        $f = "COALESCE(rn.name, r.name) AS name";
-    } else {
-        $f = "r.$field";
-    }
-
     // The subselect scopes the DISTINCT down to
     // the role ids - a DISTINCT over the whole of
     // the role table is much more expensive on some DBs
-    $sql = "SELECT r.id, $f
+    $sql = "SELECT r.id, r.$field
               FROM {$CFG->prefix}role r
                    JOIN ( SELECT DISTINCT allowassign as allowedrole 
                             FROM  {$CFG->prefix}role_allow_assign raa
                            WHERE raa.roleid IN ($roleids) ) ar
                    ON r.id=ar.allowedrole
-                   LEFT OUTER JOIN {$CFG->prefix}role_names rn
-                   ON (rn.roleid = r.id AND rn.contextid = $context->id)
             ORDER BY sortorder ASC";
 
     $rs = get_recordset_sql($sql);
@@ -4226,10 +4059,8 @@ function get_assignable_roles ($context, $field="name") {
         $roles[$r->id] = $r->{$field};
     }
     rs_close($rs);
-    foreach ($roles as $roleid => $rolename) {
-        $roles[$roleid] = strip_tags(format_string($rolename, true));
-    }
-    return $roles;
+
+    return role_fix_names($roles, $context, $rolenamedisplay);
 }
 
 /**
@@ -4240,7 +4071,7 @@ function get_assignable_roles ($context, $field="name") {
  * @param string $field
  * @return array
  */
-function get_assignable_roles_for_switchrole ($context, $field="name") {
+function get_assignable_roles_for_switchrole ($context, $field='name', $rolenamedisplay=ROLENAME_ALIAS) {
 
     global $CFG;
 
@@ -4258,18 +4089,10 @@ function get_assignable_roles_for_switchrole ($context, $field="name") {
 
     $roleids = implode(',',$roleids);
 
-    // apply context role aliases if name requested
-    if ($field == 'name') {
-        $f = "COALESCE(rn.name, r.name) AS name";
-    } else {
-        $f = "r.$field";
-    }
-
-
     // The subselect scopes the DISTINCT down to
     // the role ids - a DISTINCT over the whole of
     // the role table is much more expensive on some DBs
-    $sql = "SELECT r.id, $f
+    $sql = "SELECT r.id, r.$field
              FROM {$CFG->prefix}role r
                   JOIN ( SELECT DISTINCT allowassign as allowedrole 
                            FROM  {$CFG->prefix}role_allow_assign raa
@@ -4278,8 +4101,6 @@ function get_assignable_roles_for_switchrole ($context, $field="name") {
                   JOIN {$CFG->prefix}role_capabilities rc
                   ON (r.id = rc.roleid AND rc.capability = 'moodle/course:view' 
                       AND rc.capability != 'moodle/site:doanything') 
-                  LEFT OUTER JOIN {$CFG->prefix}role_names rn
-                  ON (rn.roleid = r.id AND rn.contextid = $context->id)
          ORDER BY sortorder ASC";
 
     $rs = get_recordset_sql($sql);
@@ -4288,10 +4109,8 @@ function get_assignable_roles_for_switchrole ($context, $field="name") {
         $roles[$r->id] = $r->{$field};
     }
     rs_close($rs);
-    foreach ($roles as $roleid => $rolename) {
-        $roles[$roleid] = strip_tags(format_string($rolename, true));
-    }
-    return $roles;
+
+    return role_fix_names($roles, $context, $rolenamedisplay);
 }
 
 /**
@@ -4299,19 +4118,19 @@ function get_assignable_roles_for_switchrole ($context, $field="name") {
  * @param object $context
  * @return array
  */
-function get_overridable_roles($context) {
+function get_overridable_roles($context, $field='name', $rolenamedisplay=ROLENAME_ALIAS) {
 
     $options = array();
 
     if ($roles = get_all_roles()) {
         foreach ($roles as $role) {
             if (user_can_override($context, $role->id)) {
-                $options[$role->id] = $role->name;
+                $options[$role->id] = $role->$field;
             }
         }
     }
 
-    return role_fix_names($options, $context);
+    return role_fix_names($options, $context, $rolenamedisplay);
 }
 
 /**
@@ -4520,11 +4339,11 @@ function get_users_by_capability($context, $capability, $fields='', $sort='',
     $sortby = $sort ? " ORDER BY $sort " : '';
 
     // User lastaccess JOIN
-    if ($sort == 'ul.timeaccess') {
+    if ((strpos($sort, 'ul.timeaccess') === FALSE) and (strpos($fields, 'ul.timeaccess') === FALSE)) {  // user_lastaccess is not required MDL-13810
+        $uljoin = '';
+    } else {
         $uljoin = "LEFT OUTER JOIN {$CFG->prefix}user_lastaccess ul 
                          ON (ul.userid = u.id AND ul.courseid = {$context->instanceid})";
-    } else {
-        $uljoin = '';
     }
 
     //
@@ -5302,19 +5121,34 @@ function role_get_name($role, $coursecontext) {
 /**
  * Prepare list of roles for display, apply aliases and format text
  * @param array $roleoptions array roleid=>rolename
- * @param object $coursecontext
+ * @param object $context
  * @return array of role names
  */
-function role_fix_names($roleoptions, $coursecontext) {
-    if ($aliasnames = get_records('role_names', 'contextid', $coursecontext->id)) {
-        foreach ($aliasnames as $alias) {
-            if (isset($roleoptions[$alias->roleid])) {
-                $roleoptions[$alias->roleid] = $alias->name;
+function role_fix_names($roleoptions, $context, $rolenamedisplay=ROLENAME_ALIAS) {
+    if ($rolenamedisplay != ROLENAME_ORIGINAL && !empty($context->id)) {
+        if ($context->contextlevel == CONTEXT_MODULE || $context->contextlevel == CONTEXT_BLOCK) {  // find the parent course context
+            if ($parentcontextid = array_shift(get_parent_contexts($context))) {
+                $context = get_context_instance_by_id($parentcontextid);
+            }
+        }
+        if ($aliasnames = get_records('role_names', 'contextid', $context->id)) {
+            if ($rolenamedisplay == ROLENAME_ALIAS) {
+                foreach ($aliasnames as $alias) {
+                    if (isset($roleoptions[$alias->roleid])) {
+                        $roleoptions[$alias->roleid] = format_string($alias->name);
+                    }
+                }
+            } else if ($rolenamedisplay == ROLENAME_BOTH) {
+                foreach ($aliasnames as $alias) {
+                    if (isset($roleoptions[$alias->roleid])) {
+                        $roleoptions[$alias->roleid] = format_string($alias->name).' ('.format_string($roleoptions[$alias->roleid]).')';
+                    }
+                }
             }
         }
     }
     foreach ($roleoptions as $rid => $name) {
-        $roleoptions[$rid] = strip_tags(format_string($name));
+        $roleoptions[$rid] = strip_tags($name);
     }
     return $roleoptions;
 }

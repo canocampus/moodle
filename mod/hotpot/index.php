@@ -6,7 +6,7 @@
     require_once("../../course/lib.php");
     require_once("lib.php");
 
-    $id = required_param('id', PARAM_INT);   // course    
+    $id = required_param('id', PARAM_INT);   // course
     if (! $course = get_record("course", "id", $id)) {
         error("Course ID is incorrect");
     }
@@ -14,7 +14,7 @@
     require_login($course->id);
 
     $coursecontext = get_context_instance(CONTEXT_COURSE, $id);
-    $sitecontext = get_context_instance(CONTEXT_SYSTEM, SITEID);
+    $sitecontext = get_context_instance(CONTEXT_SYSTEM);
 
     add_to_log($course->id, "hotpot", "view all", "index.php?id=$course->id", "");
 
@@ -36,11 +36,11 @@
 
     $title = format_string($course->shortname) . ": $strmodulenameplural";
     $heading = $course->fullname;
-    
+
     $navlinks = array();
     $navlinks[] = array('name' => $strmodulenameplural, 'link' => '', 'type' => 'activity');
     $navigation = build_navigation($navlinks);
-    
+
     print_header($title, $heading, $navigation, "", "", true, "", navmenu($course));
 
     $next_url = "$CFG->wwwroot/course/view.php?id=$course->id";
@@ -69,8 +69,11 @@
             if ($displaysection>0 && $hotpot_instance->section>0 && $displaysection<>$hotpot_instance->section) {
                 // do nothing (user is not diplaying this section)
             } else {
-                $hotpots[$hotpot_instance->id] = $hotpot_instance;
-            } 
+                $cm = get_coursemodule_from_instance('hotpot', $hotpot_instance->id);
+                if ($cm && hotpot_is_visible($cm)) {
+                    $hotpots[$hotpot_instance->id] = $hotpot_instance;
+                }
+            }
         }
     }
     if (empty($hotpots)) {
@@ -199,9 +202,9 @@
         if ($concat_field) {
             $records = get_records_sql("
                 SELECT $concat_field, COUNT(*), hotpot, name
-                FROM {$CFG->prefix}hotpot_questions 
+                FROM {$CFG->prefix}hotpot_questions
                 WHERE hotpot IN ($hotpotids)
-                GROUP BY hotpot, name 
+                GROUP BY hotpot, name
                 HAVING COUNT(*) >1
             ");
             if ($records) {
@@ -233,7 +236,7 @@
         $select .= " AND a.userid='$USER->id'";
     }
     $usejoin = 0;
-    if (has_capability('mod/hotpot:grade', get_context_instance(CONTEXT_SYSTEM, SITEID)) && $usejoin) {
+    if (has_capability('mod/hotpot:grade', get_context_instance(CONTEXT_SYSTEM)) && $usejoin) {
         // join attempts table and details table
         $tables .= ",{$CFG->prefix}hotpot_details d";
         $fields .= ',COUNT(DISTINCT d.id) AS detailcount';
@@ -244,7 +247,7 @@
     }
     $totals = get_records_sql("SELECT $fields FROM $tables WHERE $select GROUP BY a.hotpot");
 
-    if (has_capability('mod/hotpot:grade', get_context_instance(CONTEXT_SYSTEM, SITEID)) && empty($usejoin)) {
+    if (has_capability('mod/hotpot:grade', get_context_instance(CONTEXT_SYSTEM)) && empty($usejoin)) {
         foreach ($hotpots as $hotpot) {
             $totals[$hotpot->id]->detailcount = 0;
             if ($ids = get_records('hotpot_attempts', 'hotpot', $hotpot->id)) {
@@ -270,31 +273,31 @@
     }
 
     switch ($course->format) {
-        case 'weeks' : 
+        case 'weeks' :
             $title = get_string("week");
             break;
-        case 'topics' : 
+        case 'topics' :
             $title = get_string("topic");
             break;
-        default : 
+        default :
             $title = '';
             break;
     }
     if ($title) {
-        array_push($table->head, $title); 
+        array_push($table->head, $title);
         array_push($table->align, "center");
     }
     if (has_capability('moodle/course:manageactivities', $coursecontext)) {
         array_push($table->head, $strupdate);
         array_push($table->align, "center");
     }
-    array_push($table->head, 
-        get_string("name"), 
-        get_string("quizcloses", "quiz"), 
-        get_string("bestgrade", "quiz"), 
+    array_push($table->head,
+        get_string("name"),
+        get_string("quizcloses", "quiz"),
+        get_string("bestgrade", "quiz"),
         get_string("attempts", "quiz")
     );
-    array_push($table->align, 
+    array_push($table->align,
         "left", "left", "center", "left"
     );
     if (has_capability('mod/hotpot:grade', $coursecontext)) {
@@ -336,7 +339,7 @@
             $bestscore = "&nbsp;";
 
         } else {
-          
+
             $cm = get_coursemodule_from_instance('hotpot', $hotpot->id);
             // report number of attempts and users
             $report = get_string("viewallreports","quiz", $totals[$hotpot->id]->attemptcount);

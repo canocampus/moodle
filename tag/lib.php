@@ -1,19 +1,12 @@
 <?php // $Id$
 
 /**
- * lib.php - moodle tag library
- *
- * @version: $Id$
- * @licence http://www.gnu.org/copyleft/gpl.html GNU Public License
- * @package moodlecore
- *
- * A "tag string" is always a rawurlencode'd string. This is the same behavior 
- * as http://del.icio.us
- * @see http://www.php.net/manual/en/function.urlencode.php
+ * Moodle tag library
  *
  * Tag strings : you can use any character in tags, except the comma (which is 
  * the separator) and the '\' (backslash).  Note that many spaces (or other 
- * blank characters) will get "compressed" into one.
+ * blank characters) will get "compressed" into one. A tag string is always a 
+ * rawurlencode'd string. This is the same behavior as http://del.icio.us.
  *
  * A "record" is a php array (note that an object will work too) that contains 
  * the following variables : 
@@ -28,12 +21,18 @@
  *
  * BASIC INSTRUCTIONS : 
  *  - to "tag a blog post" (for example): 
- *      tag_set('post', $blog_post->id, $array_of_tags);
+ *        tag_set('post', $blog_post->id, $array_of_tags);
  *
  *  - to "remove all the tags on a blog post":
- *      tag_set('post', $blog_post->id, array());
+ *        tag_set('post', $blog_post->id, array());
  *
- * Tag set will create tags that need to be created.  
+ * Tag set will create tags that need to be created.
+ *
+ * @version: $Id$
+ * @licence http://www.gnu.org/copyleft/gpl.html GNU Public License
+ * @package moodlecore
+ * @subpackage tag
+ * @see http://www.php.net/manual/en/function.urlencode.php
  */
 
 define('TAG_RETURN_ARRAY', 0);
@@ -70,23 +69,29 @@ require_once($CFG->dirroot .'/tag/locallib.php');
  * @return void 
  */
 function tag_set($record_type, $record_id, $tags) {
-    global $db;
 
-    $record = array('type' => $record_type, 'id' => $record_id);
+    static $in_recursion_semaphore = false; // this is to prevent loops when tagging a tag
+    if ( $record_type == 'tag' && !$in_recursion_semaphore) {
+        $current_tagged_tag_name = tag_get_name($record_id);
+    }
 
     $tags_ids = tag_get_id($tags, TAG_RETURN_ARRAY); // force an array, even if we only have one tag.
     $cleaned_tags = tag_normalize($tags);
     //echo 'tags-in-tag_set'; var_dump($tags); var_dump($tags_ids); var_dump($cleaned_tags);
 
-    $current_ids = tag_get_tags_ids($record['type'], $record['id']);
-    //var_dump($current_ids);
-    $tags_to_assign = array();
+    $current_ids = tag_get_tags_ids($record_type, $record_id);
+    //var_dump($current_ids); 
 
     // for data coherence reasons, it's better to remove deleted tags
     // before adding new data: ordering could be duplicated.
     foreach($current_ids as $current_id) {
         if (!in_array($current_id, $tags_ids)) {
-            tag_delete_instance($record, $current_id);
+            tag_delete_instance($record_type, $record_id, $current_id);
+            if ( $record_type == 'tag' && !$in_recursion_semaphore) {
+                // if we are removing a tag-on-a-tag (manually related tag), 
+                // we need to remove the opposite relationship as well.
+                tag_delete_instance('tag', $current_id, $record_id);
+            }
         }
     }
 
@@ -103,17 +108,17 @@ function tag_set($record_type, $record_id, $tags) {
             // create new tags
             //echo "call to add tag $tag\n";
             $new_tag = tag_add($tag);
-            tag_assign($record, $new_tag[$clean_tag], $ordering);
-        } 
-        elseif ( empty($current_ids) || !in_array($tag_current_id, $current_ids) ) {
-            // assign existing tags
-            tag_assign($record, $tag_current_id, $ordering);
-        } 
-        elseif ( isset($current_ids[$ordering]) && $current_ids[$ordering] != $tag_current_id ) { 
-            // this actually checks if the ordering number points to the same tag
-            //recompute ordering, if necessary
-            //echo 'ordering changed for ', $tag, ':', $ordering, "\n";
-            tag_assign($record, $tag_current_id, $ordering);
+            $tag_current_id = $new_tag[$clean_tag];
+        }
+
+        tag_assign($record_type, $record_id, $tag_current_id, $ordering);
+
+        // if we are tagging a tag (adding a manually-assigned related tag), we
+        // need to create the opposite relationship as well.
+        if ( $record_type == 'tag' && !$in_recursion_semaphore) {
+            $in_recursion_semaphore = true;
+            tag_set_add('tag', $tag_current_id, $current_tagged_tag_name);
+            $in_recursion_semaphore = false;
         }
     }
 }
@@ -155,7 +160,7 @@ function tag_set_delete($record_type, $record_id, $tag) {
             $new_tags[] = $current_tag->name;
         }
     }
-    
+
     return tag_set($record_type, $record_id, $new_tags);
 }
 
@@ -214,7 +219,7 @@ function tag_description_set($tagid, $description, $descriptionformat) {
  **/
 function tag_get($field, $value, $returnfields='id, name, rawname') {
     if ($field == 'name') {
-        $value = moodle_strtolower($value);   // To cope with input that might just be wrong case
+        $value = addslashes(moodle_strtolower($value));   // To cope with input that might just be wrong case
     }
     return get_record('tag', $field, $value, '', '', '', '', $returnfields);
 }
@@ -305,7 +310,7 @@ function tag_get_tags_csv($record_type, $record_id, $html=TAG_RETURN_HTML, $type
 /**
  * Get an array of tag ids associated to a record.
  *
- * @param string $record the record type for which we want to get the tags
+ * @param string $record_type the record type for which we want to get the tags
  * @param int $record_id the record id for which we want to get the tags
  * @return array of tag ids, indexed and sorted by 'ordering'
  */
@@ -313,6 +318,12 @@ function tag_get_tags_ids($record_type, $record_id) {
     
     $tag_ids = array();
     foreach (tag_get_tags($record_type, $record_id) as $tag) {
+        if ( array_key_exists($tag->ordering, $tag_ids) ) {
+            // until we can add a unique constraint, in table tag_instance,
+            // on (itemtype, itemid, ordering), this is needed to prevent a bug
+            // TODO : modify database in 2.0
+            $tag->ordering++;
+        }
         $tag_ids[$tag->ordering] = $tag->id;
     }
     ksort($tag_ids);
@@ -504,14 +515,15 @@ function tag_delete($tagids) {
  * Delete one instance of a tag.  If the last instance was deleted, it will
  * also delete the tag, unless it's type is 'official'.
  *
- * @param array $record the record for which to remove the instance
+ * @param string $record_type the type of the record for which to remove the instance
+ * @param int $record_id the id of the record for which to remove the instance
  * @param int $tagid the tagid that needs to be removed
  * @return bool true on success, false otherwise
  */
-function tag_delete_instance($record, $tagid) {
+function tag_delete_instance($record_type, $record_id, $tagid) {
     global $CFG;
 
-    if ( delete_records('tag_instance', 'tagid', $tagid, 'itemtype', $record['type'], 'itemid', $record['id']) ) {
+    if ( delete_records('tag_instance', 'tagid', $tagid, 'itemtype', $record_type, 'itemid', $record_id) ) {
         if ( !record_exists_sql("SELECT * FROM {$CFG->prefix}tag tg, {$CFG->prefix}tag_instance ti ".
                 "WHERE (tg.id = ti.tagid AND ti.tagid = {$tagid} ) OR ".
                 "(tg.id = {$tagid} AND tg.tagtype = 'official')") ) {
@@ -520,6 +532,8 @@ function tag_delete_instance($record, $tagid) {
     } else {
         return false;
     }
+
+    return true;
 }
 
 
@@ -581,14 +595,11 @@ function tag_find_records($tag, $type, $limitfrom='', $limitnum='') {
 /////////////////// PRIVATE TAG API ///////////////////
 
 /**
- * A * @param array $record the record that will be tagged
- * @param string $tags the comma-separated tags to set on the record. If 
- *     given an empty array, all tags will be removed.
-dds one or more tag in the database.  This function should not be called 
+ * Adds one or more tag in the database.  This function should not be called 
  * directly : you should use tag_set.
  *
  * @param mixed $tags one tag, or an array of tags, to be created
- * @param string $tag_type type of tag to be created ("default" is the default 
+ * @param string $type type of tag to be created ("default" is the default 
  *     value and "official" is the only other supported value at this time). An
  *     official tag is kept even if there are no records tagged with it.
  * @return an array of tags ids, indexed by their lowercase normalized names. 
@@ -633,24 +644,25 @@ function tag_add($tags, $type="default") {
  * Assigns a tag to a record: if the record already exists, the time and
  * ordering will be updated.
  * 
- * @param array $record the record that will be tagged
+ * @param string $record_type the type of the record that will be tagged
+ * @param int $record_id the id of the record that will be tagged
  * @param string $tagid the tag id to set on the record. 
  * @param int $ordering the order of the instance for this record
  * @return bool true on success, false otherwise
  */
-function tag_assign($record, $tagid, $ordering) {
+function tag_assign($record_type, $record_id, $tagid, $ordering) {
 
     require_capability('moodle/tag:create', get_context_instance(CONTEXT_SYSTEM));
 
-    if ( $tag_instance_object = get_record('tag_instance', 'tagid', $tagid, 'itemtype', $record['type'], 'itemid', $record['id'], 'tagid') ) {
+    if ( $tag_instance_object = get_record('tag_instance', 'tagid', $tagid, 'itemtype', $record_type, 'itemid', $record_id, 'id') ) {
         $tag_instance_object->ordering = $ordering;
         $tag_instance_object->timemodified = time();
         return update_record('tag_instance', $tag_instance_object);
     } else { 
         $tag_instance_object = new StdClass;
         $tag_instance_object->tagid = $tagid;
-        $tag_instance_object->itemid = $record['id'];
-        $tag_instance_object->itemtype = $record['type'];
+        $tag_instance_object->itemid = $record_id;
+        $tag_instance_object->itemtype = $record_type;
         $tag_instance_object->ordering = $ordering;
         $tag_instance_object->timemodified = time();
         return insert_record('tag_instance', $tag_instance_object);
@@ -666,6 +678,61 @@ function tag_assign($record, $tagid, $ordering) {
 function tag_autocomplete($text) {
     global $CFG;
     return get_records_sql("SELECT tg.id, tg.name, tg.rawname FROM {$CFG->prefix}tag tg WHERE tg.name LIKE '". moodle_strtolower($text) ."%'");
+}
+
+/** 
+ * Clean up the tag tables, making sure all tagged object still exists.
+ *
+ * This should normally not be necessary, but in case related tags are not deleted
+ * when the tagged record is removed, this should be done once in a while, perhaps on
+ * an occasional cron run.  On a site with lots of tags, this could become an expensive 
+ * function to call: don't run at peak time.
+ */
+function tag_cleanup() {
+    global $CFG;
+
+    $instances = get_recordset('tag_instance');
+
+    // cleanup tag instances
+    while ($instance = rs_fetch_next_record($instances)) {
+        $delete = false;
+        
+        if (!record_exists('tag', 'id', $instance->tagid)) {
+            // if the tag has been removed, instance should be deleted.
+            $delete = true;
+        } else {
+            switch ($instance->itemtype) {
+                case 'user': // users are marked as deleted, but not actually deleted
+                    if (record_exists('user', 'id', $instance->itemid, 'deleted', 1)) {
+                        $delete = true;
+                    }
+                    break;
+                default: // anything else, if the instance is not there, delete.
+                    if (!record_exists($instance->itemtype, 'id', $instance->itemid)) {
+                        $delete = true;
+                    }
+                    break;
+            }
+        }
+        if ($delete) {
+            tag_delete_instance($instance->itemtype, $instance->itemid, $instance->tagid);
+            //debugging('deleting tag_instance #'. $instance->id .', linked to tag id #'. $instance->tagid, DEBUG_DEVELOPER);
+        }
+    }
+    rs_close($instances);
+
+    // TODO: this will only clean tags of type 'default'.  This is good as
+    // it won't delete 'official' tags, but the day we get more than two
+    // types, we need to fix this.
+    $unused_tags = get_recordset_sql("SELECT tg.id FROM {$CFG->prefix}tag tg WHERE tg.tagtype = 'default' AND NOT EXISTS (".
+        "SELECT 'x' FROM {$CFG->prefix}tag_instance ti WHERE ti.tagid = tg.id)");
+
+    // cleanup tags
+    while ($unused_tag = rs_fetch_next_record($unused_tags)) {
+        tag_delete($unused_tag->id);
+        //debugging('deleting unused tag #'. $unused_tag->id,  DEBUG_DEVELOPER);
+    }
+    rs_close($unused_tags);
 }
 
 /**
@@ -685,7 +752,9 @@ function tag_compute_correlations($min_correlation=2) {
 
     global $CFG;
 
-    $all_tags = get_records_list('tag');
+    if (!$all_tags = get_records_list('tag')) {
+        return;
+    }
 
     $tag_correlation_obj = new object();
     foreach($all_tags as $tag) {
@@ -736,6 +805,7 @@ function tag_compute_correlations($min_correlation=2) {
  */
 function tag_cron() {
     tag_compute_correlations();
+    tag_cleanup();
 }
 
 /**

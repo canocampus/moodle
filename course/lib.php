@@ -24,7 +24,6 @@ define('MOD_CLASS_RESOURCE', 1);
 
 function make_log_url($module, $url) {
     switch ($module) {
-        case 'user':
         case 'course':
         case 'file':
         case 'login':
@@ -34,6 +33,7 @@ function make_log_url($module, $url) {
         case 'mnet course':
             return "/course/$url";
             break;
+        case 'user':
         case 'blog':
             return "/$module/$url";
             break;
@@ -117,7 +117,7 @@ function build_mnet_logs_array($hostid, $course, $user=0, $date=0, $order="l.tim
 
     if ($modaction) {
         $firstletter = substr($modaction, 0, 1);
-        if (ctype_alpha($firstletter)) {
+        if (preg_match('/[[:alpha:]]/', $firstletter)) {
             $where .= " AND\n                lower(l.action) LIKE '%" . strtolower($modaction) . "%'";
         } else if ($firstletter == '-') {
             $where .= " AND\n                lower(l.action) NOT LIKE '%" . strtolower(substr($modaction, 1)) . "%'";
@@ -180,7 +180,7 @@ function build_logs_array($course, $user=0, $date=0, $order="l.time ASC", $limit
 
     if ($modaction) {
         $firstletter = substr($modaction, 0, 1);
-        if (ctype_alpha($firstletter)) {
+        if (preg_match('/[[:alpha:]]/', $firstletter)) {
             $joins[] = "lower(l.action) LIKE '%" . strtolower($modaction) . "%'";
         } else if ($firstletter == '-') {
             $joins[] = "lower(l.action) NOT LIKE '%" . strtolower(substr($modaction, 1)) . "%'";
@@ -296,6 +296,11 @@ function print_log($course, $user=0, $date=0, $order="l.time ASC", $page=0, $per
         //Filter log->info
         $log->info = format_string($log->info);
 
+        // If $log->url has been trimmed short by the db size restriction
+        // code in add_to_log, keep a note so we don't add a link to a broken url
+        $tl=textlib_get_instance();
+        $brokenurl=($tl->strlen($log->url)==100 && $tl->substr($log->url,97)=='...');
+
         $log->url  = strip_tags(urldecode($log->url));   // Some XSS protection
         $log->info = strip_tags(urldecode($log->info));  // Some XSS protection
         $log->url  = s($log->url); /// XSS protection and XHTML compatibility - should be in link_to_popup_window() instead!!
@@ -320,7 +325,12 @@ function print_log($course, $user=0, $date=0, $order="l.time ASC", $page=0, $per
         echo "    <a href=\"$CFG->wwwroot/user/view.php?id={$log->userid}&amp;course={$log->course}\">$fullname</a>\n";
         echo "</td>\n";
         echo "<td class=\"cell c4\">\n";
-        link_to_popup_window( make_log_url($log->module,$log->url), 'fromloglive',"$log->module $log->action", 440, 700);
+        $displayaction="$log->module $log->action";
+        if($brokenurl) {
+            echo $displayaction;
+        } else {
+            link_to_popup_window( make_log_url($log->module,$log->url), 'fromloglive',$displayaction, 440, 700);
+        }
         echo "</td>\n";;
         echo "<td class=\"cell c5\">{$log->info}</td>\n";
         echo "</tr>\n";
@@ -562,7 +572,7 @@ function print_log_xls($course, $user, $date, $order='l.time DESC', $modname,
 
     // Creating worksheets
     for ($wsnumber = 1; $wsnumber <= $nroPages; $wsnumber++) {
-        $sheettitle = get_string('excel_sheettitle', 'logs', $wsnumber).$nroPages;
+        $sheettitle = get_string('logs').' '.$wsnumber.'-'.$nroPages;
         $worksheet[$wsnumber] =& $workbook->add_worksheet($sheettitle);
         $worksheet[$wsnumber]->set_column(1, 1, 30);
         $worksheet[$wsnumber]->write_string(0, 0, get_string('savedat').
@@ -675,7 +685,7 @@ function print_log_ods($course, $user, $date, $order='l.time DESC', $modname,
 
     // Creating worksheets
     for ($wsnumber = 1; $wsnumber <= $nroPages; $wsnumber++) {
-        $sheettitle = get_string('excel_sheettitle', 'logs', $wsnumber).$nroPages;
+        $sheettitle = get_string('logs').' '.$wsnumber.'-'.$nroPages;
         $worksheet[$wsnumber] =& $workbook->add_worksheet($sheettitle);
         $worksheet[$wsnumber]->set_column(1, 1, 30);
         $worksheet[$wsnumber]->write_string(0, 0, get_string('savedat').
@@ -932,7 +942,7 @@ function print_recent_activity($course) {
                 $content = $print_recent_activity($course, $viewfullnames, $timestart) || $content;
             }
         } else {
-            debugging("Missing lib.php in lib/{$mod->name} - please reinstall files or uninstall the module");  
+            debugging("Missing lib.php in lib/{$modname} - please reinstall files or uninstall the module");  
         }
     }
 
@@ -982,6 +992,10 @@ function get_array_of_activities($courseid) {
 
                    $modname = $mod[$seq]->mod;
                    $functionname = $modname."_get_coursemodule_info";
+
+                   if (!file_exists("$CFG->dirroot/mod/$modname/lib.php")) {
+                       continue;
+                   }
 
                    include_once("$CFG->dirroot/mod/$modname/lib.php");
 
@@ -1085,6 +1099,10 @@ function &get_fast_modinfo(&$course, $userid=0) {
     }
 
     foreach ($info as $mod) {
+        if (empty($mod->name)) {
+            // something is wrong here
+            continue;
+        }
         // reconstruct minimalistic $cm
         $cm = new object();
         $cm->id               = $mod->cm;
@@ -1101,8 +1119,11 @@ function &get_fast_modinfo(&$course, $userid=0) {
         $cm->icon             = isset($mod->icon) ? $mod->icon : '';
         $cm->uservisible      = true;
 
-        // preload long names plurals - used very often
+        // preload long names plurals and also check module is installed properly
         if (!isset($modlurals[$cm->modname])) {
+            if (!file_exists("$CFG->dirroot/mod/$cm->modname/lib.php")) {
+                continue;
+            }
             $modlurals[$cm->modname] = get_string('modulenameplural', $cm->modname);
         }
         $cm->modplural = $modlurals[$cm->modname];
@@ -1245,7 +1266,6 @@ function print_section($course, $section, $mods, $modnamesused, $absolute=false,
     static $strmovehere;
     static $strmovefull;
     static $strunreadpostsone;
-    static $untracked;
     static $usetracking;
     static $groupings;
 
@@ -1262,7 +1282,6 @@ function print_section($course, $section, $mods, $modnamesused, $absolute=false,
         include_once($CFG->dirroot.'/mod/forum/lib.php');
         if ($usetracking = forum_tp_can_track_forums()) {
             $strunreadpostsone = get_string('unreadpostsone', 'forum');
-            $untracked         = forum_tp_get_untracked_forums($USER->id, $course->id);
         }
         $initialised = true;
     }
@@ -1299,6 +1318,10 @@ function print_section($course, $section, $mods, $modnamesused, $absolute=false,
                     continue;
                 }
             } else {
+                if (!file_exists("$CFG->dirroot/mod/$mod->modname/lib.php")) {
+                    // module not installed
+                    continue;
+                }
                 if (!coursemodule_visible_for_user($mod)) {
                     // full visibility check
                     continue;
@@ -1381,18 +1404,14 @@ function print_section($course, $section, $mods, $modnamesused, $absolute=false,
                 }
             }
             if ($usetracking && $mod->modname == 'forum') {
-                if ($usetracking and !isset($untracked[$mod->instance])) {
-                    $groupid = groups_get_activity_group($mod);
-                    $unread  = forum_tp_count_forum_unread_posts($USER->id, $mod->instance, $groupid);
-                    if ($unread) {
-                        echo '<span class="unread"> <a href="'.$CFG->wwwroot.'/mod/forum/view.php?id='.$mod->id.'">';
-                        if ($unread == 1) {
-                            echo $strunreadpostsone;
-                        } else {
-                            print_string('unreadpostsnumber', 'forum', $unread);
-                        }
-                        echo '</a> </span>';
+                if ($unread = forum_tp_count_forum_unread_posts($mod, $course)) {
+                    echo '<span class="unread"> <a href="'.$CFG->wwwroot.'/mod/forum/view.php?id='.$mod->id.'">';
+                    if ($unread == 1) {
+                        echo $strunreadpostsone;
+                    } else {
+                        print_string('unreadpostsnumber', 'forum', $unread);
                     }
+                    echo '</a></span>';
                 }
             }
 
@@ -1635,7 +1654,7 @@ function print_whole_category_list($category=NULL, $displaylist=NULL, $parentsli
     }
 
     if ($category) {
-        if ($category->visible or has_capability('moodle/course:update', get_context_instance(CONTEXT_SYSTEM, SITEID))) {
+        if ($category->visible or has_capability('moodle/course:update', get_context_instance(CONTEXT_SYSTEM))) {
             print_category_info($category, $depth, $files);
         } else {
             return;  // Don't bother printing children of invisible categories
@@ -1815,7 +1834,7 @@ function print_courses($category) {
         echo "</ul>\n";
     } else {
         print_heading(get_string("nocoursesyet"));
-        $context = get_context_instance(CONTEXT_SYSTEM, SITEID);
+        $context = get_context_instance(CONTEXT_SYSTEM);
         if (has_capability('moodle/course:create', $context)) {
             $options = array();
             $options['category'] = $category->id;
@@ -1867,6 +1886,11 @@ function print_course($course) {
                 foreach ($rusers as $ra) {
                     if ($ra->hidden == 0 || $canseehidden) {
                         $fullname = fullname($ra->user, $canviewfullnames); 
+                        if ($ra->hidden == 1) {
+                            $status = " <img src=\"{$CFG->pixpath}/t/show.gif\" title=\"".get_string('userhashiddenassignments', 'role')."\" alt=\"".get_string('hiddenassign')."\" class=\"hide-show-image\"/>";
+                        } else {
+                            $status = '';
+                        }
 
                         if (isset($aliasnames[$ra->roleid])) {
                             $ra->rolename = $aliasnames[$ra->roleid]->name;
@@ -1874,7 +1898,7 @@ function print_course($course) {
 
                         $namesarray[] = format_string($ra->rolename) 
                             . ': <a href="'.$CFG->wwwroot.'/user/view.php?id='.$ra->user->id.'&amp;course='.SITEID.'">'
-                            . $fullname . '</a>'; 
+                            . $fullname . '</a>' . $status; 
                     }
                 }
             }
@@ -2006,15 +2030,15 @@ function print_course_search($value="", $return=false, $format="plain") {
     } else if ($format == 'short') {
         $output  = '<form id="'.$id.'" action="'.$CFG->wwwroot.'/course/search.php" method="get">';
         $output .= '<fieldset class="coursesearchbox invisiblefieldset">';
-        $output .= '<label for="coursesearchbox">'.$strsearchcourses.': </label>';
-        $output .= '<input type="text" id="coursesearchbox" size="12" name="search" value="'.s($value, true).'" />';
+        $output .= '<label for="shortsearchbox">'.$strsearchcourses.': </label>';
+        $output .= '<input type="text" id="shortsearchbox" size="12" name="search" alt="'.s($strsearchcourses).'" value="'.s($value, true).'" />';
         $output .= '<input type="submit" value="'.get_string('go').'" />';
         $output .= '</fieldset></form>';
     } else if ($format == 'navbar') {
         $output  = '<form id="coursesearchnavbar" action="'.$CFG->wwwroot.'/course/search.php" method="get">';
         $output .= '<fieldset class="coursesearchbox invisiblefieldset">';
-        $output .= '<label for="coursesearchbox">'.$strsearchcourses.': </label>';
-        $output .= '<input type="text" id="coursesearchbox" size="20" name="search" value="'.s($value, true).'" />';
+        $output .= '<label for="navsearchbox">'.$strsearchcourses.': </label>';
+        $output .= '<input type="text" id="navsearchbox" size="20" name="search" alt="'.s($strsearchcourses).'" value="'.s($value, true).'" />';
         $output .= '<input type="submit" value="'.get_string('go').'" />';
         $output .= '</fieldset></form>';
     }
@@ -2386,7 +2410,10 @@ function make_editing_buttons($mod, $absolute=false, $moveselect=true, $indent=-
                         ' src="'.$CFG->pixpath.'/t/show.gif" class="iconsmall" '.
                         ' alt="'.$str->show.'" /></a>'."\n";
         }
+    } else {
+        $hideshow = '';
     }
+
     if ($mod->groupmode !== false) {
         if ($mod->groupmode == SEPARATEGROUPS) {
             $grouptitle = $str->groupsseparate;
@@ -2651,7 +2678,7 @@ function course_allowed_module($course,$mod) {
 
     // Admins and admin-like people who can edit everything can also add anything.
     // This is a bit wierd, really.  I debated taking it out but it's enshrined in help for the setting.
-    if (has_capability('moodle/course:update', get_context_instance(CONTEXT_SYSTEM, SITEID))) {
+    if (has_capability('moodle/course:update', get_context_instance(CONTEXT_SYSTEM))) {
         return true;
     }
 
@@ -2665,6 +2692,103 @@ function course_allowed_module($course,$mod) {
     }
     
     return (record_exists('course_allowed_modules','course',$course->id,'module',$modid));
+}
+
+/**
+ * Recursively delete category including all subcategories and courses.
+ * @param object $ccategory
+ * @return bool status
+ */
+function category_delete_full($category, $showfeedback=true) {
+    global $CFG;
+    require_once($CFG->libdir.'/gradelib.php');
+    require_once($CFG->libdir.'/questionlib.php');
+
+    if ($children = get_records('course_categories', 'parent', $category->id, 'sortorder ASC')) {
+        foreach ($children as $childcat) {
+            if (!category_delete_full($childcat, $showfeedback)) {
+                notify("Error deleting category $childcat->name"); 
+                return false;
+            }
+        }
+    }
+
+    if ($courses = get_records('course', 'category', $category->id, 'sortorder ASC')) {
+        foreach ($courses as $course) {
+            if (!delete_course($course->id, false)) {
+                notify("Error deleting course $course->shortname"); 
+                return false;
+            }
+            notify(get_string('coursedeleted', '', $course->shortname), 'notifysuccess'); 
+        }
+    }
+
+    // now delete anything that may depend on course category context
+    grade_course_category_delete($category->id, 0, $showfeedback);
+    if (!question_delete_course_category($category, 0, $showfeedback)) {
+        notify(get_string('errordeletingquestionsfromcategory', 'question', $category), 'notifysuccess'); 
+        return false;
+    }
+
+    // finally delete the category and it's context
+    delete_records('course_categories', 'id', $category->id);
+    delete_context(CONTEXT_COURSECAT, $category->id);
+
+    events_trigger('category_deleted', $category);
+
+    notify(get_string('coursecategorydeleted', '', format_string($category->name)), 'notifysuccess'); 
+
+    return true;
+}
+
+/**
+ * Delete category, but move contents to another category.
+ * @param object $ccategory
+ * @param int $newparentid category id
+ * @return bool status
+ */
+function category_delete_move($category, $newparentid, $showfeedback=true) {
+    global $CFG;
+    require_once($CFG->libdir.'/gradelib.php');
+    require_once($CFG->libdir.'/questionlib.php');
+
+    if (!$newparentcat = get_record('course_categories', 'id', $newparentid)) {
+        return false;
+    }
+
+    if ($children = get_records('course_categories', 'parent', $category->id, 'sortorder ASC')) {
+        foreach ($children as $childcat) {
+            if (!move_category($childcat, $newparentcat)) {
+                notify("Error moving category $childcat->name"); 
+                return false;
+            }
+        }
+    }
+
+    if ($courses = get_records('course', 'category', $category->id, 'sortorder ASC', 'id')) {
+        if (!move_courses(array_keys($courses), $newparentid)) {
+            notify("Error moving courses"); 
+            return false;
+        }
+        notify(get_string('coursesmovedout', '', format_string($category->name)), 'notifysuccess'); 
+    }
+
+    // now delete anything that may depend on course category context
+    grade_course_category_delete($category->id, $newparentid, $showfeedback);
+    if (!question_delete_course_category($category, $newparentcat, $showfeedback)) {
+        notify(get_string('errordeletingquestionsfromcategory', 'question', $category), 'notifysuccess'); 
+        return false;
+    }
+
+    // finally delete the category and it's context
+    delete_records('course_categories', 'id', $category->id);
+    delete_context(CONTEXT_COURSECAT, $category->id);
+
+    events_trigger('category_deleted', $category);
+
+    notify(get_string('coursecategorydeleted', '', format_string($category->name)), 'notifysuccess'); 
+
+    return true;
 }
 
 /***
@@ -2691,7 +2815,7 @@ function move_courses ($courseids, $categoryid) {
                     // figure out a sortorder that we can use in the destination category
                     $sortorder = get_field_sql('SELECT MIN(sortorder)-1 AS min
                                                     FROM ' . $CFG->prefix . 'course WHERE category=' . $categoryid);
-                    if ($sortorder === false) {
+                    if (is_null($sortorder) || $sortorder === false) {
                         // the category is empty
                         // rather than let the db default to 0
                         // set it to > 100 and avoid extra work in fix_coursesortorder()

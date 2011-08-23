@@ -116,7 +116,7 @@
             if (!$gtrue) {
                 $navigation = build_navigation($navlinks);
                 print_header("$strpersonalprofile: ", "$strpersonalprofile: ", $navigation, "", "", true, "&nbsp;", navmenu($course));
-                error(get_string("groupnotamember"), "../course/view.php?id=$course->id");
+                print_error("groupnotamember", '', "../course/view.php?id=$course->id");
             }
         }
     }
@@ -244,7 +244,7 @@
             print_row(get_string("phone").":", "$user->phone1");
         }
         if ($user->phone2) {
-            print_row(get_string("phone").":", "$user->phone2");
+            print_row(get_string("phone2").":", "$user->phone2");
         }
     }
 
@@ -296,7 +296,11 @@
     }
 
     if ($user->url && !isset($hiddenfields['webpage'])) {
-        print_row(get_string("webpage").":", "<a href=\"$user->url\">$user->url</a>");
+        $url = $user->url;
+        if (strpos($user->url, '://') === false) {
+            $url = 'http://'. $url;
+        }
+        print_row(get_string("webpage") .":", "<a href=\"$url\">$user->url</a>");
     }
 
     if ($user->icq && !isset($hiddenfields['icqnumber'])) {

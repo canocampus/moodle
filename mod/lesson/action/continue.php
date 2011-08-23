@@ -91,7 +91,7 @@
                 $noanswer = true;
                 break;
             }            
-            $useranswer = stripslashes(clean_param($useranswer, PARAM_RAW));
+            $useranswer = s(stripslashes(clean_param($useranswer, PARAM_RAW)));
             $userresponse = addslashes($useranswer);
             if (!$answers = get_records("lesson_answers", "pageid", $pageid, "id")) {
                 error("Continue: No answers found");
@@ -187,7 +187,7 @@
                     break; // quit answer analysis immediately after a match has been found
                 }
             }
-            $studentanswer = s($useranswer);
+            $studentanswer = $useranswer;
             break;
         
         case LESSON_TRUEFALSE :

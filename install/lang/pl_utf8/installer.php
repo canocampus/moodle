@@ -81,14 +81,24 @@ $string['downloadlanguagebutton'] = 'Pobierz \"$a\" pakiet językowy';
 $string['downloadlanguagehead'] = 'Pobierz pakiet językowy';
 $string['downloadlanguagenotneeded'] = 'Możesz kontynuować proces instalacji, używając domyślnego pakietu językowego \"$a\".';
 $string['downloadlanguagesub'] = 'Teraz masz możliwość załadowania pakietu językowego i kontynuowania procesu instalacji w tym języku.<br/><br/>Jeśli nie możesz załadować pakietu, instalacja będzie się odbywać dalej po angielsku (kiedy się skończy, będziesz mieć możliwość załadowania i zainstalowania dodatkowych pakietów językowych)';
+$string['environmenterrortodo'] = 'Musisz usunąć wszystkie problemy (błędy) w środowisku serwera zanim rozpocznie się instalacja tej wersji Moodle!';
 $string['environmenthead'] = 'Sprawdzam środowisko (ustawienia) ...';
 $string['environmentrecommendinstall'] = 'jest zalecane, żeby było zainstalowane/włączone';
+$string['environmentrecommendversion'] = 'wersja $a->needed jest zalecana a ty używasz wersji $a->current';
+$string['environmentrequirecustomcheck'] = 'ten test musi być zaliczony';
 $string['environmentrequireinstall'] = 'jest niezbędnę, żeby było zainstalowane/włączone';
+$string['environmentrequireversion'] = 'wersja $a->needed jest niezbędna a ty używasz wersji $a->current';
 $string['environmentsub'] = 'Sprawdzamy, czy różne komponenty systemu spełniają wymagania systemu';
+$string['environmentxmlerror'] = 'Błąd odczytywania danych środowiska ($a->error_code)';
 $string['error'] = 'Błąd';
 $string['fail'] = 'Nie udało się';
 $string['fileuploads'] = 'Plik pobrany';
 $string['fileuploadserror'] = 'Powinno być włączone';
+$string['fileuploadshelp'] = '<p>Przesyłany plik nie jest dostępny na Twoim serwerze.</p>
+
+<p> Możesz nadal instalować Moodle, lecz bez tego ustawienia nie będziesz mógł załadowywać plików kursu lub obrazów profilów nowych użytkowników.</p>
+
+<p> Aby umożliwić przesyłanie plików, musisz sam (lub z pomocą swojego administratora systemu) edytować główny plik php.ini w swoim systemie i zmienić ustawienie <b>file_uploads</b> to \'1\'.</p>';
 $string['gdversion'] = 'Wersja biblioteki GD';
 $string['gdversionerror'] = 'Aby przeprowadzać operacje i kreować obrazy, niezbędna jest biblioteka GD';
 $string['gdversionhelp'] = '<p> Nie masz zainstalowanego GD na swoim serwerze.</p>
@@ -98,6 +108,14 @@ $string['gdversionhelp'] = '<p> Nie masz zainstalowanego GD na swoim serwerze.</
 <p> Pod Windows-em można zazwyczaj edytować php.ini i pominąć linię odwołującą się do php_gd2.dll.</p>”';
 $string['globalsquotes'] = 'Groźne zarządzanie zmiennymi globalnymi';
 $string['globalsquoteserror'] = 'Ustal swoje ustawienia PHP:  niedostępne register_globals i/lub udostępnione magic_quotes_gpc';
+$string['globalsquoteshelp'] = '<p> Nie jest zalecane ustawienie równocześnie kombinacji niedostępnego Magoc Quotes GPC i udostępnionego Register Globals.</p>
+
+<p> Zalecane ustawienie: <b>magic_quotes_gpc = On</b> i <b>register_globals = Off</b> in your php.ini</p>
+
+<p> Jeśli nie posiadasz dostępu do swojego php.ini, możesz zamieścić następującą linię w pliku called.htacces w swoim katalogu Moodle.
+	<blockquote>php_value magic_quotes_gpc On</blockquote>
+   	<blockquote>php_value register_globals Off</blockquote>
+</p>';
 $string['help'] = 'Pomoc';
 $string['info'] = 'Informacja';
 $string['installation'] = 'Instalacja';
@@ -107,6 +125,12 @@ $string['langdownloadok'] = 'Język został \"$a\" zainstalowany pomyślnie. Ins
 $string['language'] = 'Język';
 $string['magicquotesruntime'] = 'Magic Quotes Runtime';
 $string['magicquotesruntimeerror'] = 'Powinno być wyłączone';
+$string['magicquotesruntimehelp'] = 'Aby Moodle funkcjonowało poprawnie tryb pracy Magic Quotes powinien być wyłączony.</p>
+
+<p> Domyślne ustawienie jest wyłączone ... zobacz ustawienie <b>magic_quotes_runtime</b> w swoim pliku php.ini.</p>
+
+<p>Jeśli nie posiadasz dostępu do swojego php.ini, możesz zamieścić następującą linię w pliku called.htacces w swoim katalogu Moodle:
+	 <blockquote>php_value magic_quotes_runtime Off</blockquote> </p>';
 $string['memorylimit'] = 'Ograniczenie pamięci';
 $string['memorylimiterror'] = '= Limit pamięci PHP jest ustawiony zbyt nisko ... może to powodować problemy w przyszłości';
 $string['memorylimithelp'] = 'Limit pamięci PHP dla Twojego serwera jest ustawiony obecnie na $a.</p>
@@ -131,6 +155,7 @@ $string['mysqlextensionisnotpresentinphp'] = 'PHP nie został prawidłowo skonfi
 $string['name'] = 'Nazwa';
 $string['next'] = 'Następne';
 $string['ok'] = 'OK';
+$string['opensslrecommended'] = 'Instalacja opcjonalnej biblioteki OpenSSL jest wysoce zalecane -- aktywuje sieciową funkcjonalność Moodle.';
 $string['parentlanguage'] = '<<DO TŁUMACZY: Jeżeli Twój język ma Język nadrzędny który powinien być użyty w przypadku braku tlumaczenia, wpisz tutaj odpowiedni kod (np: nl). Pozostawienia pustego powoduje używanie języka angielskiego.>>';
 $string['password'] = 'Hasło';
 $string['php50restricted'] = 'PHP 5.0.x posiada kilka znanych błędów, proszę uaktualnić do wersji 5.1.x lub zredukować do wersji 4.3.x lub 4.4.x';
@@ -146,8 +171,15 @@ $string['report'] = 'Raport';
 $string['restricted'] = 'Ograniczony';
 $string['safemode'] = 'Bezpieczny tryb';
 $string['safemodeerror'] = 'Moodle ma trudności z włączeniem bezpiecznego trybu';
+$string['safemodehelp'] = '“<p> Moodle może mieć wiele zróżnicowanych problemów z trybem bezpiecznym z czego nie najmniejszym jest brak możliwości tworzenia nowych plików. 
+
+<p> Tryb bezpieczny jest zazwyczaj dostępny jedynie na publicznych host-ach web a więc musisz znaleźć nową firmę hostingową dla Twojej strony Moodle.</p>
+
+<p> Można kontynuować instalacje, lecz należy spodziewać się pewnych problemów w przyszłości.</p>';
 $string['sessionautostart'] = 'Automatyczny start sesji';
 $string['sessionautostarterror'] = 'To powinno być wyłączone';
+$string['sessionautostarthelp'] = '<p>Moodle wymaga obsługi sesjii nie będzie bez niego funkcjonować.</p>
+<p>Sesja może być zainicjowana w pliku php.ini  poszukaj parametrów session.auto_start sesji </p>';
 $string['status'] = 'Status';
 $string['thischarset'] = 'UTF-8';
 $string['thisdirection'] = 'ltr';

@@ -8,7 +8,7 @@
 
     require_login();
 
-    require_capability('moodle/site:approvecourse', get_context_instance(CONTEXT_SYSTEM, SITEID));
+    require_capability('moodle/site:approvecourse', get_context_instance(CONTEXT_SYSTEM));
 
     $approve      = optional_param('approve', 0, PARAM_INT);
     $reject       = optional_param('reject', 0, PARAM_INT);
@@ -48,7 +48,8 @@
             if ($courseid = insert_record("course",$course)) {
                 $page = page_create_object(PAGE_COURSE_VIEW, $courseid);
                 blocks_repopulate_page($page); // Return value not checked because you can always edit later
-                add_teacher($teacherid,$courseid);
+                $context = get_context_instance(CONTEXT_COURSE, $courseid);
+                role_assign($CFG->creatornewroleid, $teacherid, 0, $context->id); // assing teacher role
                 $course->id = $courseid;
                 if (!empty($CFG->restrictmodulesfor) && $CFG->restrictmodulesfor != 'none' && !empty($CFG->restrictbydefault)) { // if we're all or requested we're ok.
                     $allowedmods = explode(',',$CFG->defaultallowedmodules);
@@ -67,7 +68,7 @@
                 exit;
             }
             else {
-                error(get_string('courseapprovedfailed'));
+                print_error('courseapprovedfailed');
                 exit;
             }
         }

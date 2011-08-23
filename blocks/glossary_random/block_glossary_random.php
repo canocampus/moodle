@@ -8,7 +8,7 @@ class block_glossary_random extends block_base {
     function init() {
 
         $this->title = get_string('blockname','block_glossary_random');
-        $this->version = 2005040500;
+        $this->version = 2007101509;
 
     }
 
@@ -224,6 +224,18 @@ class block_glossary_random extends block_base {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Executed after block instance has been created, we use it to recode
+     * the glossary config setting to point to the new (restored) one
+     */
+    function after_restore($restore) {
+    /// We need to transform the glossary->id from the original one to the restored one
+        if ($rec = backup_getid($restore->backup_unique_code, 'glossary', $this->config->glossary)) {
+            $this->config->glossary = $rec->new_id;
+            $this->instance_config_commit();
+        }
     }
 
 }

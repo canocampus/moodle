@@ -19,7 +19,7 @@
 
     function init() {
         $this->title = get_string('feedstitle', 'block_rss_client');
-        $this->version = 2007080101;
+        $this->version = 2007101509;
         $this->cron = 300; /// Set min time between cron executions to 300 secs (5 mins)
     }
 
@@ -330,6 +330,9 @@
             mtrace('    ' . $rec->url . ' ', '');
         /// Fetch the rss feed, using standard magpie caching
         /// so feeds will be renewed only if cache has expired
+            // sometimes the cron times out on moodle.org during fetching,
+            // there is a 5s limit in magpie which should work, but does not sometimes :-(
+            @set_time_limit(60);
             if ($rss = fetch_rss($rec->url)) {
                 mtrace ('ok');
             } else {

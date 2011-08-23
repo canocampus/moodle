@@ -231,9 +231,9 @@
 
                 $secondrow = array();
                 $secondrow[] = new tabobject('assign', $CFG->wwwroot.'/'.$CFG->admin.'/roles/assign.php?contextid='.$usercontext->id.'&amp;userid='.$user->id.'&amp;courseid='.$course->id
-                                  ,get_string('assignroles', 'role'));
+                                  ,get_string('localroles', 'role'));
                 $secondrow[] = new tabobject('override', $CFG->wwwroot.'/'.$CFG->admin.'/roles/override.php?contextid='.$usercontext->id.'&amp;userid='.$user->id.'&amp;courseid='.$course->id
-                                  ,get_string('overrideroles', 'role'));
+                                  ,get_string('overridepermissions', 'role'));
 
             }
         }
@@ -246,8 +246,12 @@
         $tabs = array($toprow);
     }
 
-/// Print out the tabs and continue!
-
-    print_tabs($tabs, $currenttab, $inactive, $activetwo);
+    if ($currenttab == 'editprofile' && ($user->id == $USER->id) && user_not_fully_set_up($USER)) {  
+        /// We're being forced here to fix profile
+      notify(get_string('moreprofileinfoneeded'));
+    } else {
+      /// Print out the tabs and continue!
+      print_tabs($tabs, $currenttab, $inactive, $activetwo);
+    }
 
 ?>

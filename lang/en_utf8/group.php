@@ -133,4 +133,8 @@ $string['removegroupingsmembers'] = 'Remove all groups from groupings';
 $string['deleteallgroups'] = 'Delete all groups';
 $string['deleteallgroupings'] = 'Delete all groupings';
 
+$string['groupsgroupings'] = 'Groups &amp; groupings';
+$string['groupingsonly'] = 'Groupings only';
+$string['groupsonly'] = 'Groups only';
+
 ?>

@@ -509,6 +509,8 @@ function scorm_view_display ($user, $scorm, $action, $cm, $boxwidth='') {
     global $CFG;
 
     if ($scorm->updatefreq == UPDATE_EVERYTIME){
+        require_once($CFG->dirroot.'/mod/scorm/lib.php');
+
         $scorm->instance = $scorm->id;
         scorm_update_instance($scorm);
     }
@@ -597,7 +599,7 @@ function scorm_simple_play($scorm,$user) {
   
    $scoes = get_records_select('scorm_scoes','scorm='.$scorm->id.' AND launch<>\'\'');
    
-   if (count($scoes) == 1) {
+   if ($scoes && (count($scoes) == 1)) {
        if ($scorm->skipview >= 1) {
            $sco = current($scoes);
            if (scorm_get_tracks($sco->id,$user->id) === false) {

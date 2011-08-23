@@ -10,10 +10,11 @@ class mod_forum_post_form extends moodleform {
         $mform    =& $this->_form;
 
         $course        = $this->_customdata['course'];
+        $cm            = $this->_customdata['cm'];
         $coursecontext = $this->_customdata['coursecontext'];
         $modcontext    = $this->_customdata['modcontext'];
         $forum         = $this->_customdata['forum'];
-        $post          = $this->_customdata['post'];
+        $post          = $this->_customdata['post']; // hack alert
 
 
         // the upload manager is used directly in post precessing, moodleform::save_files() is not used yet
@@ -33,7 +34,7 @@ class mod_forum_post_form extends moodleform {
         $mform->addElement('format', 'format', get_string('format'));
 
 
-        if (isset($forum->id) && forum_is_forcesubscribed($forum->id)) {
+        if (isset($forum->id) && forum_is_forcesubscribed($forum)) {
 
             $mform->addElement('static', 'subscribemessage', get_string('subscription', 'forum'), get_string('everyoneissubscribed', 'forum'));
             $mform->addElement('hidden', 'subscribe');
@@ -60,11 +61,11 @@ class mod_forum_post_form extends moodleform {
 
         }
 
-        if (empty($post->id) && has_capability('moodle/course:manageactivities', $coursecontext)) {
+        if (empty($post->id) && has_capability('moodle/course:manageactivities', $coursecontext)) { // hack alert
             $mform->addElement('checkbox', 'mailnow', get_string('mailnow', 'forum'));
         }
 
-        if (!empty($CFG->forum_enabletimedposts) && !$post->parent && has_capability('mod/forum:viewhiddentimedposts', $coursecontext)) {
+        if (!empty($CFG->forum_enabletimedposts) && !$post->parent && has_capability('mod/forum:viewhiddentimedposts', $coursecontext)) { // hack alert
             $mform->addElement('header', '', get_string('displayperiod', 'forum'));
 
             $mform->addElement('date_selector', 'timestart', get_string('displaystart', 'forum'), array('optional'=>true));
@@ -80,9 +81,20 @@ class mod_forum_post_form extends moodleform {
             $mform->setType('timeend', PARAM_INT);
             $mform->setConstants(array('timestart'=> 0, 'timeend'=>0));
         }
+
+        if (groups_get_activity_groupmode($cm, $course)) { // hack alert
+            if (empty($post->groupid)) {
+                $groupname = get_string('allparticipants');
+            } else {
+                $group = groups_get_group($post->groupid);
+                $groupname = format_string($group->name);
+            }
+            $mform->addElement('static', 'groupinfo', get_string('group'), $groupname);
+        }
+
 //-------------------------------------------------------------------------------
         // buttons
-        if (isset($post->edit)) {
+        if (isset($post->edit)) { // hack alert
             $submit_string = get_string('savechanges');
         } else {
             $submit_string = get_string('posttoforum', 'forum');

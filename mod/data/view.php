@@ -105,11 +105,30 @@
         $SESSION->dataprefs[$data->id]['advanced'] = 0;
         $SESSION->dataprefs[$data->id]['order'] = ($data->defaultsortdir == 0) ? 'ASC' : 'DESC';
     }
-    $advanced = optional_param('advanced', $SESSION->dataprefs[$data->id]['advanced'], PARAM_INT);
+
+    // reset advanced form
+    if (!is_null(optional_param('resetadv', null, PARAM_RAW))) {
+        $SESSION->dataprefs[$data->id]['search_array'] = array();
+        // we need the redirect to cleanup the form state properly
+        redirect("view.php?id=$cm->id&amp;mode=$mode&amp;search=&amp;advanced=1");
+    }
+
+    $advanced = optional_param('advanced', -1, PARAM_INT);
+    if ($advanced == -1) {
+        $advanced = $SESSION->dataprefs[$data->id]['advanced'];
+    } else {
+        if (!$advanced) {
+            // explicitly switched to normal mode - discard all advanced search settings
+            $SESSION->dataprefs[$data->id]['search_array'] = array();
+        }
+        $SESSION->dataprefs[$data->id]['advanced'] = $advanced;
+    }
+
     $search_array = $SESSION->dataprefs[$data->id]['search_array'];
-    
+
     if (!empty($advanced)) {
         $search = '';
+        $vals = array();
         $fields = get_records('data_fields', 'dataid', $data->id);
         
         //Added to ammend paging error. This error would occur when attempting to go from one page of advanced
@@ -133,40 +152,71 @@
         else {
             $paging = true;
         }
-        if (!empty($fields)) {        
+        if (!empty($fields)) {
             foreach($fields as $field) {
                 $searchfield = data_get_field_from_id($field->id, $data);
                 //Get field data to build search sql with.  If paging is false, get from user.
                 //If paging is true, get data from $search_array which is obtained from the $SESSION (see line 116).
                 if(!$paging) {
                     $val = $searchfield->parse_search_field();
-                }
-                else {
+                } else {
                     //Set value from session if there is a value @ the required index.
-                    if(isset($search_array[$field->id])) {
+                    if (isset($search_array[$field->id])) {
                         $val = $search_array[$field->id]->data;
-                    }
-                    else {             //If there is not an entry @ the required index, set value to blank.
+                    } else {             //If there is not an entry @ the required index, set value to blank.
                         $val = '';
                     }
-                }    
-                if (!empty($val)) {
-                    $search_array[$field->id] = new stdClass;
-                    $search_array[$field->id]->sql = $searchfield->generate_sql('c'.$field->id, $val);
-                    $search_array[$field->id]->data = $val;             
-                    $search .= ' '.$val;          
                 }
-                else {
-                    if (isset($search_array[$field->id])) {
-                        // clear it out
-                        unset($search_array[$field->id]);
-                    }
+                if (!empty($val)) {
+                    $search_array[$field->id] = new object();
+                    $search_array[$field->id]->sql  = $searchfield->generate_sql('c'.$field->id, $val);
+                    $search_array[$field->id]->data = $val;
+                    $vals[] = $val;
+                } else {
+                    // clear it out
+                    unset($search_array[$field->id]);
                 }
             }
         }
+
+        if (!$paging) {
+            // name searching
+            $fn = optional_param('u_fn', '', PARAM_NOTAGS);
+            $ln = optional_param('u_ln', '', PARAM_NOTAGS);
+        } else {
+            $fn = isset($search_array[DATA_FIRSTNAME]) ? $search_array[DATA_FIRSTNAME]->data : '';
+            $ln = isset($search_array[DATA_LASTNAME]) ? $search_array[DATA_LASTNAME]->data : '';
+        }
+        if (!empty($fn)) {
+            $search_array[DATA_FIRSTNAME] = new object();
+            $search_array[DATA_FIRSTNAME]->sql   = '';
+            $search_array[DATA_FIRSTNAME]->field = 'u.firstname';
+            $search_array[DATA_FIRSTNAME]->data  = $fn;
+            $vals[] = $fn;
+        } else {
+            unset($search_array[DATA_FIRSTNAME]);
+        }
+        if (!empty($ln)) {
+            $search_array[DATA_LASTNAME] = new object();
+            $search_array[DATA_LASTNAME]->sql   = '';
+            $search_array[DATA_LASTNAME]->field = 'u.lastname';
+            $search_array[DATA_LASTNAME]->data  = $ln;
+            $vals[] = $ln;
+        } else {
+            unset($search_array[DATA_LASTNAME]);
+        }
+
         $SESSION->dataprefs[$data->id]['search_array'] = $search_array;     // Make it sticky
-    }
-    else {
+
+        // in case we want to switch to simple search later - there might be multiple values there ;-)
+        if ($vals) {
+            $val = reset($vals);
+            if (is_string($val)) {
+                $search = $val;
+            }
+        }
+
+    } else {
         $search = optional_param('search', $SESSION->dataprefs[$data->id]['search'], PARAM_NOTAGS);
         //Paging variable not used for standard search. Set it to null.
         $paging = NULL;
@@ -257,7 +307,9 @@
     }
 
     if ($data->intro and empty($page) and empty($record) and $mode != 'single') {
-        print_box(format_text($data->intro), 'generalbox', 'intro');
+        $options = new object();
+        $options->noclean = true;
+        print_box(format_text($data->intro, FORMAT_MOODLE, $options), 'generalbox', 'intro');
     }
 
 /// Delete any requested records
@@ -313,10 +365,15 @@
     }
     include('tabs.php');
 
-    if ($mode != 'asearch') {
+    if ($mode == 'asearch') {
+        $maxcount = 0;
+        
+    } else {
     /// Approve any requested records
 
-        if ($approve && confirm_sesskey() && has_capability('mod/data:approve', $context)) {
+        $approvecap = has_capability('mod/data:approve', $context); 
+
+        if ($approve && confirm_sesskey() && $approvecap) {
             if ($approverecord = get_record('data_records', 'id', $approve)) {   // Need to check this is valid
                 if ($approverecord->dataid == $data->id) {                       // Must be from this database
                     $newrecord->id = $approverecord->id;
@@ -328,28 +385,18 @@
             }
         }
     
-    // Check the number of entries required against the number of entries already made (doesn't apply to teachers)
-    $requiredentries_allowed = true;
-    $numentries = data_numentries($data);
-    if ($data->requiredentries > 0 && $numentries < $data->requiredentries && !has_capability('mod/data:manageentries', $context)) {
-        $entriesleft = $data->requiredentries - $numentries;
-        $strentrieslefttoadd = get_string('entrieslefttoadd', 'data', $entriesleft);
-        notify($strentrieslefttoadd); 
-        $requiredentries_allowed = false;
-    }
-
-    // If not teacher, check whether user has sufficient records to view
-        if (!has_capability('mod/data:managetemplates', $context) and data_numentries($data) < $data->requiredentriestoview){
-            notify (($data->requiredentriestoview - data_numentries($data)).'&nbsp;'.get_string('insufficiententries','data'));
-            echo '</td></tr></table>';
-            print_footer($course);
-            exit;
+        // Check the number of entries required against the number of entries already made (doesn't apply to teachers)
+        $requiredentries_allowed = true;
+        $numentries = data_numentries($data);
+        if ($data->requiredentries > 0 && $numentries < $data->requiredentries && !has_capability('mod/data:manageentries', $context)) {
+            $data->entriesleft = $data->requiredentries - $numentries;
+            $strentrieslefttoadd = get_string('entrieslefttoadd', 'data', $data);
+            notify($strentrieslefttoadd);
+            $requiredentries_allowed = false;
         }
 
-
-    /// We need to examine the whole dataset to produce the correct paging
-
-        if ((!has_capability('mod/data:managetemplates', $context)) && ($data->approval)) {
+    /// setup group and approve restrictions
+        if (!$approvecap && $data->approval) {
             if (isloggedin()) {
                 $approveselect = ' AND (r.approved=1 OR r.userid='.$USER->id.') ';
             } else {
@@ -365,126 +412,125 @@
             $groupselect = ' ';
         }
 
-    /// Find the field we are sorting on
-        if ($sort and $sortfield = data_get_field_from_id($sort, $data)) {
+        $ilike = sql_ilike(); //Be case-insensitive
 
-            $sortcontent = $sortfield->get_sort_field();
-            $sortcontentfull = $sortfield->get_sort_sql('c.'.$sortcontent);
-            
-            $what = ' DISTINCT r.id, r.approved, r.userid, u.firstname, u.lastname, c.'.$sortcontent.', '.$sortcontentfull.' AS _order ';
+    /// Find the field we are sorting on
+        if ($sort <= 0 or !$sortfield = data_get_field_from_id($sort, $data)) {
+
+            switch ($sort) {
+                case DATA_LASTNAME:
+                    $ordering = "u.lastname $order, u.firstname $order";
+                    break;
+                case DATA_FIRSTNAME:
+                    $ordering = "u.firstname $order, u.lastname $order";
+                    break;
+                case DATA_APPROVED:
+                    $ordering = "r.approved $order, r.timecreated $order";
+                    break;
+                case DATA_TIMEMODIFIED:
+                    $ordering = "r.timemodified $order";
+                    break;
+                case DATA_TIMEADDED:
+                default:
+                    $sort     = 0;
+                    $ordering = "r.timecreated $order";
+            }
+
+            $what = ' DISTINCT r.id, r.approved, r.timecreated, r.timemodified, r.userid, u.firstname, u.lastname';
             $count = ' COUNT(DISTINCT c.recordid) ';
-            $tables = $CFG->prefix.'data_content c,'.$CFG->prefix.'data_records r,'.$CFG->prefix.'data_content c1, '.$CFG->prefix.'user u ';
+            $tables = $CFG->prefix.'data_content c,'.$CFG->prefix.'data_records r,'.$CFG->prefix.'data_content cs, '.$CFG->prefix.'user u ';
             $where =  'WHERE c.recordid = r.id
-                         AND c.fieldid = '.$sort.'
                          AND r.dataid = '.$data->id.'
                          AND r.userid = u.id
-                         AND c1.recordid = r.id ';
-            $sortorder = ' ORDER BY _order '.$order.' , r.id ASC ';
+                         AND cs.recordid = r.id ';
+            $sortorder = ' ORDER BY '.$ordering.', r.id ASC ';
             $searchselect = '';
-            
+
             // If requiredentries is not reached, only show current user's entries
             if (!$requiredentries_allowed) {
                 $where .= ' AND u.id = ' . $USER->id;
             }
-            
-            if (!empty($advanced)) {                                                                                           //If advanced box is checked.
-                foreach($search_array as $key => $val) {                                                       //what does $search_array hold?
+
+            if (!empty($advanced)) {                                                  //If advanced box is checked.
+                foreach($search_array as $key => $val) {                              //what does $search_array hold?
+                    if ($key == DATA_FIRSTNAME or $key == DATA_LASTNAME) {
+                        $searchselect .= " AND $val->field $ilike '%{$val->data}%'";
+                        continue;
+                    }
                     $tables .= ', '.$CFG->prefix.'data_content c'.$key.' ';
                     $where .= ' AND c'.$key.'.recordid = r.id';
                     $searchselect .= ' AND ('.$val->sql.') ';
                 }
-            }
-            elseif ($search) {
-                $searchselect = ' AND (c1.content ' . sql_ilike() . " '%$search%') "; //Be case-insensitive
+            } else if ($search) {
+                $searchselect = " AND (cs.content $ilike '%$search%' OR u.firstname $ilike '%$search%' OR u.lastname $ilike '%$search%' ) ";
             } else {
                 $searchselect = ' ';
-            } 
-        } else if ($search) {
-            $what = ' DISTINCT r.id, r.approved, r.userid, u.firstname, u.lastname ';
-            $count = ' COUNT(DISTINCT c.recordid) ';
-            $tables = $CFG->prefix.'data_content c,'.$CFG->prefix.'data_records r, '.$CFG->prefix.'user u ';
-            $where =  'WHERE c.recordid = r.id
-                         AND r.userid = u.id
-                         AND r.dataid = '.$data->id;
-            $sortorder = ' ORDER BY r.id ASC ';
-            $searchselect = '';
-            
-            // If requiredentries is not reached, only show current user's entries
-            if (!$requiredentries_allowed) {
-                $where .= ' AND u.id = ' . $USER->id;
-            }
-            
-            if (!empty($advanced)) {                                                                                           //Advanced search box again.
-                foreach($search_array as $key => $val) {
-                    $tables .= ', '.$CFG->prefix.'data_content c'.$key.' ';
-                    $where .= ' AND c'.$key.'.recordid = r.id ';
-                    $searchselect .= ' AND ('.$val->sql.') ';
-                }
-            }
-            else {
-                $searchselect = ' AND (c.content ' . sql_ilike() . " '%$search%') "; //Be case-insensitive
             }
 
-            
         } else {
-            $what = ' DISTINCT r.id, r.approved, r.timecreated, r.userid, u.firstname, u.lastname ';
-            $count = ' COUNT(r.id) ';
-            $tables = $CFG->prefix.'data_records r, '.$CFG->prefix.'user u ';
-            $where =  'WHERE r.dataid = '.$data->id. ' AND r.userid = u.id ';
-            $sortorder = ' ORDER BY r.timecreated '.$order. ' ';
-            $searchselect = ' ';
-            
+
+            $sortcontent = $sortfield->get_sort_field();
+            $sortcontentfull = $sortfield->get_sort_sql('c.'.$sortcontent);
+
+            $what = ' DISTINCT r.id, r.approved, r.timecreated, r.timemodified, r.userid, u.firstname, u.lastname, c.'.$sortcontent.', '.$sortcontentfull.' AS _order ';
+            $count = ' COUNT(DISTINCT c.recordid) ';
+            $tables = $CFG->prefix.'data_content c,'.$CFG->prefix.'data_records r,'.$CFG->prefix.'data_content cs, '.$CFG->prefix.'user u ';
+            $where =  'WHERE c.recordid = r.id
+                         AND c.fieldid = '.$sort.'
+                         AND r.dataid = '.$data->id.'
+                         AND r.userid = u.id
+                         AND cs.recordid = r.id ';
+            $sortorder = ' ORDER BY _order '.$order.' , r.id ASC ';
+            $searchselect = '';
+
             // If requiredentries is not reached, only show current user's entries
             if (!$requiredentries_allowed) {
                 $where .= ' AND u.id = ' . $USER->id;
+            }
+
+            if (!empty($advanced)) {                                                  //If advanced box is checked.
+                foreach($search_array as $key => $val) {                              //what does $search_array hold?
+                    if ($key == DATA_FIRSTNAME or $key == DATA_LASTNAME) {
+                        $searchselect .= " AND $val->field $ilike '%{$val->data}%'";
+                        continue;
+                    }
+                    $tables .= ', '.$CFG->prefix.'data_content c'.$key.' ';
+                    $where .= ' AND c'.$key.'.recordid = r.id';
+                    $searchselect .= ' AND ('.$val->sql.') ';
+                }
+            } else if ($search) {
+                $searchselect = " AND (cs.content $ilike '%$search%' OR u.firstname $ilike '%$search%' OR u.lastname $ilike '%$search%' ) ";
+            } else {
+                $searchselect = ' ';
             }
         }
 
-
     /// To actually fetch the records
 
-        $fromsql = ' FROM '.$tables.$where.$groupselect.$approveselect.$searchselect;
+        $fromsql    = "FROM $tables $where $groupselect $approveselect $searchselect";
+        $sqlselect  = "SELECT $what $fromsql $sortorder";
+        $sqlcount   = "SELECT $count $fromsql";   // Total number of records when searching
+        $sqlrids    = "SELECT tmp.id FROM ($sqlselect) tmp";
+        $sqlmax     = "SELECT $count FROM $tables $where $groupselect $approveselect"; // number of all recoirds user may see
 
-        $sqlselect = 'SELECT '.$what.$fromsql.$sortorder;
-
-        $sqlcount  = 'SELECT '.$count.$fromsql;   // Total number of records
-
-    /// Work out the paging numbers
+    /// Work out the paging numbers and counts
 
         $totalcount = count_records_sql($sqlcount);
+        if (empty($searchselect)) {
+            $maxcount = $totalcount;
+        } else {
+            $maxcount = count_records_sql($sqlmax);
+        }
 
         if ($record) {     // We need to just show one, so where is it in context?
             $nowperpage = 1;
             $mode = 'single';
 
-    #  Following code needs testing to make it work
-    #        if ($sort) {   // We need to search by that field
-    #            if ($content = get_field('data_content', 'content', 'recordid', $record->id, 'fieldid', $sort)) {
-    #                $content = addslashes($content);
-    #                if ($order == 'ASC') {
-    #                    $lessthan = " AND $sortcontentfull < '$content'
-    #                                   OR ($sortcontentfull = '$content' AND r.id < '$record->id') ";
-    #                } else {
-    #                    $lessthan = " AND $sortcontentfull > '$content'
-    #                                   OR ($sortcontentfull = '$content' AND r.id < '$record->id') ";
-    #                }
-    #            } else {   // Failed to find data (shouldn't happen), so fall back to something easy
-    #                $lessthan = " r.id < '$record->id' ";
-    #            }
-    #        } else {
-    #            $lessthan = " r.id < '$record->id' ";
-    #        }
-    #        $sqlindex = 'SELECT COUNT(DISTINCT c.recordid) '.$fromsql.$lessthan.$sortorder;
-    #        $page = count_records_sql($sqlindex);
-
-
-            $allrecords = get_records_sql($sqlselect);      // Kludgey but accurate at least!          
             $page = 0;
-            foreach ($allrecords as $key => $allrecord) {
-                if ($key == $record->id) {
-                    break;
-                }
-                $page++;
+            if ($allrecordids = get_records_sql($sqlrids)) {
+                $allrecordids = array_keys($allrecordids);
+                $page = (int)array_search($record->id, $allrecordids);
+                unset($allrecordids);
             }
 
         } else if ($mode == 'single') {  // We rely on ambient $page settings
@@ -496,26 +542,39 @@
 
     /// Get the actual records
         
-        $records = get_records_sql($sqlselect, $page * $nowperpage, $nowperpage);
-
-        if (empty($records)) {     // Nothing to show!
+        if (!$records = get_records_sql($sqlselect, $page * $nowperpage, $nowperpage)) {
+            // Nothing to show!
             if ($record) {         // Something was requested so try to show that at least (bug 5132)
                 if (has_capability('mod/data:manageentries', $context) || empty($data->approval) ||
                          $record->approved || (isloggedin() && $record->userid == $USER->id)) {
                     if (!$currentgroup || $record->groupid == $currentgroup || $record->groupid == 0) {
-                        $records[] = $record;
+                        // OK, we can show this one
+                        $records = array($record->id => $record);
+                        $totalcount = 1;
                     }
                 }
             }
-            if ($records) {  // OK, we can show this one
-                data_print_template('singletemplate', $records, $data, $search, $page);
-            } else if ($search){
-                notify(get_string('nomatch','data'));
+        }
+
+        if (empty($records)) {
+            if ($maxcount){
+                $a = new object();
+                $a->max = $maxcount;
+                $a->reseturl = "view.php?id=$cm->id&amp;mode=$mode&amp;search=&amp;advanced=0";
+                notify(get_string('foundnorecords','data', $a));
             } else {
                 notify(get_string('norecords','data'));
             }
 
-        } else {                   //  We have some records to print
+        } else { //  We have some records to print
+
+            if ($maxcount != $totalcount) {
+                $a = new object();
+                $a->num = $totalcount;
+                $a->max = $maxcount;
+                $a->reseturl = "view.php?id=$cm->id&amp;mode=$mode&amp;search=&amp;advanced=0";
+                notify(get_string('foundrecords', 'data', $a), 'notifysuccess'); 
+            }
 
             if ($mode == 'single') {                  // Single template
                 $baseurl = 'view.php?d='.$data->id.'&amp;mode=single&amp;';
@@ -560,7 +619,7 @@
     }
 
     //Advanced search form doesn't make sense for single (redirects list view)
-    if ($records || $search || $page ||  $mode == 'asearch'  && $mode != 'single') {
+    if (($maxcount || $mode == 'asearch') && $mode != 'single') {
         data_print_preference_form($data, $perpage, $search, $sort, $order, $search_array, $advanced, $mode);
     }
 

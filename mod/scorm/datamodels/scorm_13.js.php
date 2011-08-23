@@ -210,9 +210,9 @@ function SCORMapi1_3() {
     $objectives = '';
     foreach($userdata as $element => $value){
         if (substr($element,0,14) == 'cmi.objectives') {
-            preg_match('/\.(\d+)\./',$element,$matches);
-            $element = preg_replace('/\.(\d+)\./',".N\$1.",$element);
-            if ($matches[1] == $count) {
+            $element = preg_replace('/\.(\d+)\./', "_\$1.", $element);
+            preg_match('/_(\d+)\./', $element, $matches);
+            if (isset($matches[1]) && $matches[1] == $count) {
                 $count++;
                 $end = strpos($element,$matches[1])+strlen($matches[1]);
                 $subelement = substr($element,0,$end);
@@ -1120,7 +1120,7 @@ function SCORMapi1_3() {
                 echo 'popupwin(result);';
             }
         ?>
-        var results = result.split('\n');
+        var results = String(result).split('\n');
         if ((results.length > 2) && (navrequest != '')) {
             eval(results[2]);
         }

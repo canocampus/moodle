@@ -2,18 +2,59 @@
 
 define('BYTESERVING_BOUNDARY', 's1k2o3d4a5k6s7'); //unique string constant
 
+function get_file_url($path, $options=null, $type='coursefile') {
+    global $CFG;
+
+    $path = trim($path, '/'); // no leading and trailing slashes
+
+    // type of file
+    switch ($type) {
+        case 'coursefile':
+        default:
+            $url = "$CFG->wwwroot/file.php";
+    }
+
+    if ($CFG->slasharguments) {
+        $parts = explode('/', $path);
+        $parts = array_map('urlencode', $parts);
+        $path  = implode('/', $parts);
+        $ffurl = "$CFG->wwwroot/file.php/$path";
+        $separator = '?';
+    } else {
+        $path = urlencode("/$path");
+        $ffurl = "$CFG->wwwroot/file.php?file=$path";
+        $separator = '&amp;';
+    }
+
+    if ($options) {
+        foreach ($options as $name=>$value) {
+            $ffurl = $ffurl.$separator.$name.'='.$value;
+            $separator = '&amp;';
+        }
+    }
+
+    return $ffurl;
+}
+
 /**
  * Fetches content of file from Internet (using proxy if defined). Uses cURL extension if present.
  * Due to security concerns only downloads from http(s) sources are supported.
  *
  * @param string $url file url starting with http(s)://
- * @param array $headers http headers, null if none
+ * @param array $headers http headers, null if none. If set, should be an
+ *   associative array of header name => value pairs.
  * @param array $postdata array means use POST request with given parameters
  * @param bool $fullresponse return headers, responses, etc in a similar way snoopy does
- * @param int $timeout connection timeout
+ *   (if false, just returns content)
+ * @param int $timeout timeout for complete download process including all file transfer
+ *   (default 5 minutes)
+ * @param int $connecttimeout timeout for connection to server; this is the timeout that
+ *   usually happens if the remote server is completely down (default 20 seconds);
+ *   may not work when using proxy
+ * @param bool $skipcertverify If true, the peer's SSL certificate will not be checked. Only use this when already in a trusted location.
  * @return mixed false if request failed or content of the file as string if ok.
  */
-function download_file_content($url, $headers=null, $postdata=null, $fullresponse=false, $timeout=20) {
+function download_file_content($url, $headers=null, $postdata=null, $fullresponse=false, $timeout=300, $connecttimeout=20, $skipcertverify=false) {
     global $CFG;
 
     // some extra security
@@ -43,6 +84,7 @@ function download_file_content($url, $headers=null, $postdata=null, $fullrespons
         require_once($CFG->libdir.'/snoopy/Snoopy.class.inc');
         $snoopy = new Snoopy();
         $snoopy->read_timeout = $timeout;
+        $snoopy->_fp_timeout  = $connecttimeout;
         $snoopy->proxy_host   = $CFG->proxyhost;
         $snoopy->proxy_port   = $CFG->proxyport;
         if (!empty($CFG->proxyuser) and !empty($CFG->proxypassword)) {
@@ -106,6 +148,11 @@ function download_file_content($url, $headers=null, $postdata=null, $fullrespons
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers2);
     }
 
+        
+    if ($skipcertverify) {
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    }
+    
     // use POST if requested
     if (is_array($postdata)) {
         foreach ($postdata as $k=>$v) {
@@ -118,7 +165,8 @@ function download_file_content($url, $headers=null, $postdata=null, $fullrespons
 
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HEADER, true);
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $connecttimeout);
+    curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
     if (!ini_get('open_basedir') and !ini_get('safe_mode')) {
         // TODO: add version test for '7.10.5'
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
@@ -512,6 +560,7 @@ function send_file($path, $filename, $lifetime=86400 , $filter=0, $pathisstring=
     $lastmodified = $pathisstring ? time() : filemtime($path);
     $filesize     = $pathisstring ? strlen($path) : filesize($path);
 
+/* - MDL-13949
     //Adobe Acrobat Reader XSS prevention
     if ($mimetype=='application/pdf' or mimeinfo('type', $filename)=='application/pdf') {
         //please note that it prevents opening of pdfs in browser when http referer disabled
@@ -527,6 +576,7 @@ function send_file($path, $filename, $lifetime=86400 , $filter=0, $pathisstring=
             $lifetime = 1; // >0 needed for byteserving
         }
     }
+*/
 
     //IE compatibiltiy HACK!
     if (ini_get('zlib.output_compression')) {

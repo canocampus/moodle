@@ -881,7 +881,7 @@ function xmldb_main_upgrade($oldversion=0) {
 
         if( $defaultroleid != $userrole->id ) {
             //  Add in the new moodle/my:manageblocks capibility to the default user role
-            $context = get_context_instance(CONTEXT_SYSTEM, SITEID);
+            $context = get_context_instance(CONTEXT_SYSTEM);
             assign_capability('moodle/my:manageblocks',CAP_ALLOW,$defaultroleid,$context->id);
         }
 
@@ -2584,8 +2584,8 @@ function xmldb_main_upgrade($oldversion=0) {
 
             // Create new user directory
             if (!$newdir = make_user_directory($userid)) {
-                $result = false;
-                break;
+                // some weird directory - do not stop the upgrade, just ignore it
+                continue;
             }
 
             // Move contents of old directory to new one
@@ -2939,6 +2939,63 @@ function xmldb_main_upgrade($oldversion=0) {
         upgrade_main_savepoint($result, 2007101508.08);
     }
 
+    if ($result && $oldversion < 2007101509) {
+        // force full regrading
+        set_field('grade_items', 'needsupdate', 1, 'needsupdate', 0);
+    }
+
+    if ($result && $oldversion < 2007101510) {
+    /// Fix minor problem caused by MDL-5482.
+        require_once($CFG->dirroot . '/question/upgrade.php');
+        $result = $result && question_fix_random_question_parents();
+        upgrade_main_savepoint($result, 2007101510);
+    }
+
+    if ($result && $oldversion < 2007101511) {
+        // if guest role used as default user role unset it and force admin to choose new setting
+        if (!empty($CFG->defaultuserroleid)) {
+            if ($role = get_record('role', 'id', $CFG->defaultuserroleid)) {
+                if ($guestroles = get_roles_with_capability('moodle/legacy:guest', CAP_ALLOW)) {
+                    if (isset($guestroles[$role->id])) {
+                        set_config('defaultuserroleid', null);
+                        notify('Guest role removed from "Default role for all users" setting, please select another role.', 'notifysuccess');
+                    }
+                }
+            } else {
+                set_config('defaultuserroleid', null);
+            }
+        }
+    }
+
+    if ($result && $oldversion < 2007101512) {
+        notify('Increasing size of user idnumber field, this may take a while...', 'notifysuccess');
+
+    /// Define index idnumber (not unique) to be dropped form user
+        $table = new XMLDBTable('user');
+        $index = new XMLDBIndex('idnumber');
+        $index->setAttributes(XMLDB_INDEX_NOTUNIQUE, array('idnumber'));
+
+    /// Launch drop index idnumber
+        if (index_exists($table, $index)) {
+            $result = $result && drop_index($table, $index);
+        }
+
+    /// Changing precision of field idnumber on table user to (255)
+        $table = new XMLDBTable('user');
+        $field = new XMLDBField('idnumber');
+        $field->setAttributes(XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, null, null, null, 'password');
+
+    /// Launch change of precision for field idnumber
+        $result = $result && change_field_precision($table, $field);
+
+    /// Launch add index idnumber again
+        $index = new XMLDBIndex('idnumber');
+        $index->setAttributes(XMLDB_INDEX_NOTUNIQUE, array('idnumber'));
+        $result = $result && add_index($table, $index);
+
+    /// Main savepoint reached
+        upgrade_main_savepoint($result, 2007101512);
+    }
 
     return $result;
 }

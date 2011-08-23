@@ -34,6 +34,7 @@ if (has_capability('moodle/site:sendmessage', get_context_instance(CONTEXT_SYSTE
     echo "<html $direction xmlns=\"http://www.w3.org/1999/xhtml\">\n<head>\n";
     echo '<meta http-equiv="content-type" content="text/html; charset=utf-8" />';
     echo $stylesheetshtml;
+    include($CFG->javascript);
 
 /// Script parameters
     $userid   = required_param('id', PARAM_INT);
@@ -47,7 +48,7 @@ if (has_capability('moodle/site:sendmessage', get_context_instance(CONTEXT_SYSTE
 
 /// Check that the user is not blocking us!!
     if ($contact = get_record('message_contacts', 'userid', $user->id, 'contactid', $USER->id)) {
-        if ($contact->blocked and !has_capability('moodle/site:readallmessages', get_context_instance(CONTEXT_SYSTEM, SITEID))) {
+        if ($contact->blocked and !has_capability('moodle/site:readallmessages', get_context_instance(CONTEXT_SYSTEM))) {
             print_heading(get_string('userisblockingyou', 'message'));
             exit;
         }
@@ -73,7 +74,7 @@ if (has_capability('moodle/site:sendmessage', get_context_instance(CONTEXT_SYSTE
         $options->newlines = true;
         $message = format_text($message, $format, $options);
 
-        $time = userdate(time(), get_string('strftimedaytime'));
+        $time = userdate(time(), get_string('strftimedatetimeshort'));
         $message = '<div class="message me"><span class="author">'.fullname($USER).'</span> '.
                    '<span class="time">['.$time.']</span>: '.
                    '<span class="content">'.$message.'</span></div>';

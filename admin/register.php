@@ -5,14 +5,14 @@
 
     require_login();
 
-    require_capability('moodle/site:config', get_context_instance(CONTEXT_SYSTEM, SITEID));
+    require_capability('moodle/site:config', get_context_instance(CONTEXT_SYSTEM));
 
     if (!$site = get_site()) {
         redirect("index.php");
     }
 
     if (!confirm_sesskey()) {
-        error(get_string('confirmsesskeybad', 'error'));
+        print_error('confirmsesskeybad', 'error');
     }
 
     if (!$admin = get_admin()) {

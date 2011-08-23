@@ -93,7 +93,7 @@
 
 /// Check that the user is not blocking us!!
     if ($contact = get_record('message_contacts', 'userid', $user->id, 'contactid', $USER->id)) {
-        if ($contact->blocked and !has_capability('moodle/site:readallmessages', get_context_instance(CONTEXT_SYSTEM, SITEID))) {
+        if ($contact->blocked and !has_capability('moodle/site:readallmessages', get_context_instance(CONTEXT_SYSTEM))) {
             print_heading(get_string('userisblockingyou', 'message'));
             exit;
         }
@@ -199,8 +199,8 @@
 
     if ($messages = get_records_select('message_read', "(useridto = '$USER->id' AND useridfrom = '$userid' AND timeread > '$start' $lastsql) OR (useridto = '$userid' AND useridfrom = '$USER->id' AND timeread > '$start' $lastsql)")) {
         foreach ($messages as $message) {
-            $time = userdate($message->timecreated, get_string('strftimedaytime'));
-
+            $time = userdate($message->timecreated, get_string('strftimedatetimeshort'));
+            
             if ($message->useridfrom == $USER->id) {
                 $fullname = $mefullname;
             } else {
@@ -223,7 +223,7 @@
 
     if ($messages = get_records_select('message', "useridto = '$userid' AND useridfrom = '$USER->id' $lastsql")) {
         foreach ($messages as $message) {
-            $time = userdate($message->timecreated, get_string('strftimedaytime'));
+            $time = userdate($message->timecreated, get_string('strftimedatetimeshort'));
 
             $printmessage = format_text($message->message, $message->format, $options, 0);
             $printmessage = '<div class="message other"><span class="author">'.$mefullname.'</span> '.
@@ -241,7 +241,7 @@
 
     if ($messages = get_records_select('message', "useridto = '$USER->id' AND useridfrom = '$userid' $lastsql")) {
         foreach ($messages as $message) {
-            $time = userdate($message->timecreated, get_string('strftimedaytime'));
+            $time = userdate($message->timecreated, get_string('strftimedatetimeshort'));
 
             $printmessage = format_text($message->message, $message->format, $options, 0);
             $printmessage = '<div class="message other"><span class="author">'.$userfullname.'</span> '.

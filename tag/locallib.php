@@ -21,10 +21,13 @@ function tag_print_cloud($nr_of_tags=150, $return=false) {
     
     $can_manage_tags = has_capability('moodle/tag:manage', get_context_instance(CONTEXT_SYSTEM));
 
-    $tagcloud = get_records_sql('SELECT tg.rawname, tg.id, tg.name, tg.tagtype, COUNT(ti.id) AS count, tg.flag '.
+    if ( !$tagcloud = get_records_sql('SELECT tg.rawname, tg.id, tg.name, tg.tagtype, COUNT(ti.id) AS count, tg.flag '.
         'FROM '. $CFG->prefix .'tag_instance ti INNER JOIN '. $CFG->prefix .'tag tg ON tg.id = ti.tagid '.
-        'GROUP BY tg.id, tg.rawname, tg.name, tg.flag '.
-        'ORDER BY count DESC, tg.name ASC', 0, $nr_of_tags);
+        'WHERE ti.itemtype != \'tag\' '.
+        'GROUP BY tg.id, tg.rawname, tg.name, tg.flag, tg.tagtype '.
+        'ORDER BY count DESC, tg.name ASC', 0, $nr_of_tags) ) {
+        $tagcloud = array();
+    }
 
     $totaltags  = count($tagcloud);
     $currenttag = 0;
@@ -58,7 +61,7 @@ function tag_print_cloud($nr_of_tags=150, $return=false) {
             $tagname = tag_display_name($tag);
         }
 
-        $link = $CFG->wwwroot .'/tag/index.php?tag='. rawurlencode($tag->name) .'"';
+        $link = $CFG->wwwroot .'/tag/index.php?tag='. rawurlencode($tag->name);
         $output .= '<li><a href="'. $link .'" class="'. $tag->class .'" '.
             'title="'. get_string('numberofentries', 'blog', $tag->count) .'">'.
             $tagname .'</a></li> ';
@@ -175,12 +178,10 @@ function tag_print_management_box($tag_object, $return=false) {
         $links[] = '<a href="'. $CFG->wwwroot .'/tag/user.php?action=flaginappropriate&amp;sesskey='. sesskey() .'&amp;tag='. rawurlencode($tag_object->name) .'">'. get_string('flagasinappropriate', 'tag', rawurlencode($tagname)) .'</a>';
 
         // Edit tag: Only people with moodle/tag:edit capability who either have it as an interest or can manage tags
-        if (has_capability('moodle/tag:edit', $systemcontext) && 
-                (tag_record_tagged_with('user', $USER->id, $tag_object->name) || 
-                 has_capability('moodle/tag:manage', $systemcontext))) {
+        if (has_capability('moodle/tag:edit', $systemcontext) || 
+            has_capability('moodle/tag:manage', $systemcontext)) {
             $links[] = '<a href="'. $CFG->wwwroot .'/tag/edit.php?tag='. rawurlencode($tag_object->name) .'">'. get_string('edittag', 'tag') .'</a>';
         }
-
 
         $output .= implode(' | ', $links);
         $output .= print_box_end(true);

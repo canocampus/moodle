@@ -5,7 +5,7 @@ include_once($CFG->dirroot . '/course/lib.php');
 class block_course_list extends block_list {
     function init() {
         $this->title = get_string('courses');
-        $this->version = 2004111600;
+        $this->version = 2007101509;
     }
     
     function has_config() {
@@ -25,7 +25,7 @@ class block_course_list extends block_list {
         $this->content->footer = '';
 
         $icon  = "<img src=\"$CFG->pixpath/i/course.gif\"".
-                 " class=\"icon\" alt=\"".get_string("course")."\" />";
+                 " class=\"icon\" alt=\"".get_string("coursecategory")."\" />";
        
         $adminseesall = true;
         if (isset($CFG->block_course_list_adminview)) {

@@ -32,15 +32,20 @@
         error("Attempt ID was incorrect");
     }
 
-    require_login($course, true, $cm);
-    
+    require_login($course);
+
+    // check user can access this hotpot activity
+    if (!hotpot_is_visible($cm)) {
+        print_error("activityiscurrentlyhidden");
+    }
+
     $context = get_context_instance(CONTEXT_MODULE, $cm->id);
     if (!has_capability('mod/hotpot:viewreport',$context)) {
         if (!$hotpot->review) {
-            error(get_string("noreview", "quiz"));
+            print_error("noreview", "quiz");
         }
         //if (time() < $hotpot->timeclose) {
-        //  error(get_string("noreviewuntil", "quiz", userdate($hotpot->timeclose)));
+        //  print_error("noreviewuntil", "quiz", '', userdate($hotpot->timeclose));
         //}
         if ($attempt->userid != $USER->id) {
             error("This is not your attempt!");
@@ -53,7 +58,7 @@
     // print header
     $title = format_string($course->shortname) . ": $hotpot->name";
     $heading = $course->fullname;
-    
+
     $navigation = build_navigation('', $cm);
     $button = update_module_button($cm->id, $course->id, $strmodulename);
     print_header($title, $heading, $navigation, "", "", true, $button, navmenu($course, $cm));
@@ -102,10 +107,10 @@ function hotpot_print_attempt_summary(&$hotpot, &$attempt) {
                 $value = hotpot_format_status($attempt);
                 break;
             case 'timerecorded':
-                $value = empty($attempt->timefinish) ? '-' : userdate($attempt->timefinish); 
+                $value = empty($attempt->timefinish) ? '-' : userdate($attempt->timefinish);
                 break;
             case 'timetaken':
-                $value = empty($attempt->timefinish) ? '-' : format_time($attempt->timefinish - $attempt->timestart); 
+                $value = empty($attempt->timefinish) ? '-' : format_time($attempt->timefinish - $attempt->timestart);
                 break;
             default:
                 $value = isset($attempt->$field) ? $attempt->$field : NULL;

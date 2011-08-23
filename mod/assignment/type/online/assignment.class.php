@@ -35,9 +35,11 @@ class assignment_online extends assignment_base {
         if ($editmode) {
             //guest can not edit or submit assignment
             if (!has_capability('mod/assignment:submit', $context)) {
-                error(get_string('guestnosubmit', 'assignment'));
+                print_error('guestnosubmit', 'assignment');
             }
         }
+
+        add_to_log($this->course->id, "assignment", "view", "view.php?id={$this->cm->id}", $this->assignment->id, $this->cm->id);
 
 /// prepare form and process submitted data
         $mform = new mod_assignment_online_edit_form();
@@ -107,12 +109,12 @@ class assignment_online extends assignment_base {
                 }
             }
             print_simple_box_end();
-            if (!$editmode && $editable) { 
-                echo "<div style='text-align:center'>"; 
-                print_single_button('view.php', array('id'=>$this->cm->id,'edit'=>'1'), 
-                        get_string('editmysubmission', 'assignment')); 
-                echo "</div>"; 
-            } 
+            if (!$editmode && $editable) {
+                echo "<div style='text-align:center'>";
+                print_single_button('view.php', array('id'=>$this->cm->id,'edit'=>'1'),
+                        get_string('editmysubmission', 'assignment'));
+                echo "</div>";
+            }
 
         }
 
@@ -167,7 +169,13 @@ class assignment_online extends assignment_base {
         $update->data2        = $data->format;
         $update->timemodified = time();
 
-        return update_record('assignment_submissions', $update);
+        if (!update_record('assignment_submissions', $update)) {
+            return false;
+        }
+
+        $submission = $this->get_submission($USER->id);
+        $this->update_grade($submission);
+        return true;
     }
 
 
@@ -262,6 +270,7 @@ class mod_assignment_online_edit_form extends moodleform {
         $mform->addElement('htmleditor', 'text', get_string('submission', 'assignment'), array('cols'=>85, 'rows'=>30));
         $mform->setType('text', PARAM_RAW); // to be cleaned before display
         $mform->setHelpButton('text', array('reading', 'writing', 'richtext'), false, 'editorhelpbutton');
+        $mform->addRule('text', get_string('required'), 'required', null, 'client');
 
         $mform->addElement('format', 'format', get_string('format'));
         $mform->setHelpButton('format', array('textformat', get_string('helpformatting')));

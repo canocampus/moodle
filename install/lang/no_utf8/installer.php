@@ -36,6 +36,8 @@ $string['configfilewritten'] = 'config.php er opprett uten feil';
 $string['configurationcompletehead'] = 'Konfigurasjonen er ferdig';
 $string['configurationcompletesub'] = 'Moodle gjorde et forsøk på å lagre konfigurasjonen din i en fil i roten av Moodle-installasjonen din';
 $string['continue'] = 'Fortsett';
+$string['ctyperecommended'] = 'Å installer det valgfrie PHP tillegget ctype er anbefalt på det høyeste for å forbedre nettstedsytelsen, særlig hvis nettstedet ditt støtter ikke-latinske språk (eks. kinesisk, japansk, russisk o.l)';
+$string['ctyperequired'] = 'PHP tillegget ctype er nå påkrevd av Moodle for å forbedre nettstedsytelse og å støtte kompatibilitet med en del andre språk.';
 $string['curlrecommended'] = 'Vi anbefaler sterkt at Curl-biblioteket legges til i php.ini for å aktivere Moodles Nettverksfunksjonalitet.';
 $string['customcheck'] = 'A';
 $string['database'] = 'Database';
@@ -71,6 +73,12 @@ $string['databasesettingssub_mysql'] = '<b>Type:</b> MySQL<br />
 <b>Bruker:</b> ditt brukernavn til databasen<br />
 <b>Passord:</b> databasepassordet ditt<br />
 <b>Tabell prefix:</b> prefiks å bruke foran alle tabellnavnene (valgfritt)';
+$string['databasesettingssub_mysqli'] = '<b>Type:</b> Forbedret MySQL<br />
+<b>Vert:</b> f.eks localhost or db.isp.no<br />
+<b>Navn:</b> databasenavn, eks moodle<br />
+<b>Bruker<:</b> databasebrukernavnet ditt<br />
+<b>Password:</b> databasepassordet ditt<br />
+<b>Tabellprefiks:</b> prefiks å bruke for alle tabell navn (valgfritt)';
 $string['databasesettingssub_oci8po'] = '<b>Type:</b> Oracle<br />
 <b>Vert:</b> brukes ikke, må være blank<br />
 <b>Navn:</b> gitt navn på tnsnames.ora forbindelsen<br />
@@ -89,6 +97,7 @@ $string['databasesettingssub_postgres7'] = '<b>Type:</b> PostgreSQL<br />
 <b>Bruker:</b> ditt brukernavn til databasen<br />
 <b>Passord:</b> databasepassordet ditt<br />
 <b>Tabell prefix:</b> prefiks å bruke foran alle tabellnavnene (obligatorisk)';
+$string['databasesettingswillbecreated'] = '<b>NB:</b> Installeringen vil prøve å lage databasen automatisk hvis den ikke eksisterer.';
 $string['dataroot'] = 'Datamappe';
 $string['datarooterror'] = '\"Datamappen\" du oppga kunne ikke bli funnet eller opprettet. Vennligst rett stien eller opprett katalogen manuelt.';
 $string['dbconnectionerror'] = 'Fikk ingen forbindelse til databasen du oppga. Vennligst sjekk database-innstillingene dine.';
@@ -134,6 +143,11 @@ $string['error'] = 'Feil';
 $string['fail'] = 'Feilet';
 $string['fileuploads'] = 'Filopplastinger';
 $string['fileuploadserror'] = 'Denne skulle finnes på';
+$string['fileuploadshelp'] = '<p>Filopplasting ser ut til å være slått av på serveren din.</p>
+
+<p>Moodle kan fortsatt installeres, men uten denne muligheten, vil du ikke kunne laste opp kursfiler eller nye profilbilder.</p>
+
+<p>For å slå på filopplasting må du (eller systemadministratoren) måtte redigere php.ini fila for hele systemet ditt og endre innstillingene for <b>file_uploads</b> til \'1\'.</p>';
 $string['gdversion'] = 'GD versjon';
 $string['gdversionerror'] = 'GD-biblioteket må være tilstede for å kunne behandle og opprette bilder.';
 $string['gdversionhelp'] = '<p>Det ser ikke ut som serveren din har GD installert.</p>
@@ -145,6 +159,15 @@ $string['gdversionhelp'] = '<p>Det ser ikke ut som serveren din har GD installer
 <p>I Windows kan du vanligvis redigere php.ini og ta bort kommentarmarkeringen på linjen for php_gd2.dll.</p>';
 $string['globalsquotes'] = 'Usikker behandling av Globale verdier';
 $string['globalsquoteserror'] = 'Ordne PHP innstillingene: slå av register_globals og/eller slå på magic_quotes_gpc';
+$string['globalsquoteshelp'] = '<p>Kombinasjonen av avslått Magic Quotes GPC og påslått Register Globals er ikke anbefalt.</p>
+
+<p>Anbefalt innstilling er: <b>magic_quotes_gpc = On</b> og <b>register_globals = Off</b> i php.ini fila di</p>
+
+<p>Hvis du ikke har tilgang til  php.ini, kan du klare å plassere følgende linjer i en fil som heter eller skal hete .htaccess i Moodle-mappen din:
+<blockquote>php_value magic_quotes_gpc On</blockquote>
+<blockquote>php_value register_globals Off</blockquote>
+</p>';
+$string['globalswarning'] = '<p><strong>Sikkerhetsadvarsel</strong>: for å virke ordentlig trenger Moodle <br />at du gjør enkelte endringer i din nåværende PHP-innstillinger.<p/><p>Du <em>må</em> sette <code>register_globals=off</code>.<p>Denne innstillingen redigeres ved å endre din <code>php.ini</code>fil, Apache/IIS <br />konfigurasjon eller  <code>.htaccess</code> file.</p>';
 $string['help'] = 'Hjelp';
 $string['iconvrecommended'] = 'Installering av ICONV-biblioteket er sterkt anbefalt for å forbedre ytelsen, spesielt hvis siten din støtter ikke-latinske språk.';
 $string['info'] = 'Informasjon';
@@ -155,6 +178,13 @@ $string['langdownloadok'] = 'Installasjonen av språket \"$a\" var vellykket. In
 $string['language'] = 'Språk';
 $string['magicquotesruntime'] = 'Magic Quotes Oppetid';
 $string['magicquotesruntimeerror'] = 'Denne bør være av';
+$string['magicquotesruntimehelp'] = '<p>Magic quotes runtime/oppetid bør være slått av for at Moodle skal fungere ordentlig.</p>
+
+<p>Normalt er den avslått som standard... se innstillingen for <b>magic_quotes_runtime</b> i php.ini fila.</p>
+
+<p>Hvis du ikke har tilgang til php.ini, kan du skrive inn følgende linjer i en fil som du kaller .htaccess i Moodlekatalogen din:
+<blockquote>php_value magic_quotes_runtime Off</blockquote>
+</p>';
 $string['mbstringrecommended'] = 'Installering av det valgfrie bibliotek MBSTRING er  anbefalt for at du skal forbedre ytelsen til nettstedet, spesielt hvis nettstedet støtter ikke-latinske språk.';
 $string['memorylimit'] = 'Minne-grense';
 $string['memorylimiterror'] = 'Minnegrensen for PHP er satt for lavt... du kan få problemer med dette senere.';
@@ -180,6 +210,8 @@ $string['mysql'] = 'MySQL (mysql)';
 $string['mysql416bypassed'] = 'Likevel, dersom Moodle-siten bare bruker iso-8859-1 (latin, KAN du likevel bruke din installerte MySQL 4.1.12 (eller høyere).';
 $string['mysql416required'] = 'MySQL 4.1.16 er minstekravet for Moodle 1.6.x, hvis vi skal garantere at alle data skal kunne konverteres til UTF-8 i fremtiden.';
 $string['mysqlextensionisnotpresentinphp'] = 'PHP har ikke blitt ordentlig konfigurert med MySQL innstillingene slik at den kan kommunisere med MySQL. Vær vennlig å sjekk php.ini fila di eller rekompiler PHP.';
+$string['mysqli'] = 'Forbedret MySQL (mysqli)';
+$string['mysqliextensionisnotpresentinphp'] = 'PHP er ikke ordentlig innstilt med MySQLi tillegget slik at den kan kommunisere med MySQL. Sjekk php.ini fila di eller rekompiler PHP. MySQLi tillegget finnes ikke for PHP 4.';
 $string['name'] = 'Navn';
 $string['next'] = 'Neste';
 $string['oci8po'] = 'Oracle (oci8po)';
@@ -208,9 +240,17 @@ $string['report'] = 'Rapport';
 $string['restricted'] = 'Begrenset';
 $string['safemode'] = 'Sikkermodus';
 $string['safemodeerror'] = 'Moodle kan ha trøbbel når sikkermodus er på';
+$string['safemodehelp'] = '<p>Moodle kan oppleve en rekke problemer med sikkermodus på, ikke minst det at du sannsynligvis ikke kan opprette nye filer.</p>
+
+<P>Sikkermodus er vanligvis bare slått på på paranoide offentlige webtjenere, så det kan hende du må finne en ny webtilbyder for Moodle-siden din.</p>
+
+<p>Du kan fortsette installasjonen hvis du ønsker, men det kan hende du får en del problemer.</p>';
 $string['serverchecks'] = 'Serveren sjekker';
 $string['sessionautostart'] = 'Sesjon Autostart';
 $string['sessionautostarterror'] = 'Denne bør være av';
+$string['sessionautostarthelp'] = '<P>Moodle trenger sesjonsupport og vil ikke virke uten.</p>
+
+<p>Sesjoner kan slås på i php.ini fila se etter session.auto_start variabelen.</p>';
 $string['skipdbencodingtest'] = 'Hopp over DB koding testen';
 $string['status'] = 'Status';
 $string['thischarset'] = 'UTF-8';
@@ -232,4 +272,5 @@ $string['wrongsourcebase'] = 'Galt ZIP-filnavn.';
 $string['wrongzipfilename'] = 'Galt ZIP-filnavn.';
 $string['wwwroot'] = 'Web addresse';
 $string['wwwrooterror'] = 'Webadressen synes ikke å være gyldig - denne Moodleinstallasjonen synes ikke å være der. Innstilling har blitt resatt.';
+$string['xmlrpcrecommended'] = 'Å installere det valgfrie xmlrpc-tillegget er nyttig for Moodle Networking funksjonaliteten.';
 ?>

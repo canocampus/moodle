@@ -474,7 +474,7 @@
                 }
 
                 if (!zip_files($files,"$basedir$wdir/$name")) {
-                    error(get_string("zipfileserror","error"));
+                    print_error("zipfileserror","error");
                 }
 
                 clearfilelist();
@@ -532,7 +532,7 @@
                 $file = basename($file);
 
                 if (!unzip_file("$basedir$wdir/$file")) {
-                    error(get_string("unzipfileserror","error"));
+                    print_error("unzipfileserror","error");
                 }
 
                 echo "<div style=\"text-align:center\"><form action=\"index.php\" method=\"get\">";
@@ -667,7 +667,7 @@ function printfilelist($filelist) {
 
     foreach ($filelist as $file) {
         if (is_dir($basedir.'/'.$file)) {
-            echo "<img src=\"$CFG->pixpath/f/folder.gif\" class=\"icon\" alt=\"$strfolder\" /> $file<br />";
+            echo '<img src="'. $CFG->pixpath .'/f/folder.gif" class="icon" alt="'. $strfolder .'" /> '. htmlspecialchars($file) .'<br />';
             $subfilelist = array();
             $currdir = opendir($basedir.'/'.$file);
             while (false !== ($subfile = readdir($currdir))) {
@@ -679,7 +679,7 @@ function printfilelist($filelist) {
 
         } else {
             $icon = mimeinfo("icon", $file);
-            echo "<img src=\"$CFG->pixpath/f/$icon\"  class=\"icon\" alt=\"$strfile\" /> $file<br />";
+            echo '<img src="'. $CFG->pixpath .'/f/'. $icon .'" class="icon" alt="'. $strfile .'" /> '. htmlspecialchars($file) .'<br />';
         }
     }
 }
@@ -867,7 +867,7 @@ function displaydir ($wdir) {
 
         choose_from_menu ($options, "action", "", "$strwithchosenfiles...", "javascript:getElementById('dirform').submit()");
         echo '<div id="noscriptgo" style="display: inline;">';
-        echo '<input type="submit" value="'.get_string('go').'" /></div>';
+        echo '<input type="submit" value="'.get_string('go').'" />';
         echo '<script type="text/javascript">'.
                "\n//<![CDATA[\n".
                'document.getElementById("noscriptgo").style.display = "none";'.

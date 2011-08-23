@@ -12,7 +12,7 @@ class block_admin_tree extends block_base {
     function init() {
         global $PAGE;
         $this->title = get_string('administrationsite');
-        $this->version = 2006090300;
+        $this->version = 2007101509;
         $this->currentdepth = 0;
         $this->divcounter = 1;
         $this->tempcontent = '';
@@ -22,8 +22,11 @@ class block_admin_tree extends block_base {
     }
 
     function applicable_formats() {
-        //TODO: add 'my' only if user has role assigned in system or any course category context
-        return array('site' => true, 'admin' => true, 'my' => true);
+        if (has_capability('moodle/site:config', get_context_instance(CONTEXT_SYSTEM))) {
+            return array('site' => true, 'admin' => true, 'my' => true);
+        } else {
+            return array('site' => true, 'admin' => true);
+        }
     }
 
     function preferred_width() {

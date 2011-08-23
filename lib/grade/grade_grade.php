@@ -272,7 +272,7 @@ class grade_grade extends grade_object {
      */
     function get_dategraded() {
         //TODO: HACK - create new fields in 2.0
-        if (is_null($this->finalgrade)) {
+        if (is_null($this->finalgrade) and is_null($this->feedback)) {
             return null; // no grade == no date
         } else if ($this->overridden) {
             return $this->overridden;
@@ -366,8 +366,8 @@ class grade_grade extends grade_object {
             $this->locked = 0;
             $this->update();
 
-            if ($refresh) {
-                //refresh when unlocking
+            if ($refresh and !$this->is_overridden()) {
+                //refresh when unlocking and not overridden
                 $this->grade_item->refresh_grades($this->userid);
             }
 
@@ -701,7 +701,38 @@ class grade_grade extends grade_object {
             $this->grade_item = $grade_item;
             $this->itemid = $grade_item->id;
         }
+
+        // Return null if finalgrade is null
+        if (is_null($this->finalgrade)) {
+            return null;
+        }
+
+        // Return null if gradepass == grademin or gradepass is null
+        if (is_null($this->grade_item->gradepass) || $this->grade_item->gradepass == $this->grade_item->grademin) {
+            return null;
+        }
+
         return $this->finalgrade >= $this->grade_item->gradepass;
+    }
+
+    function insert($source=null) {
+        // TODO: dategraded hack - do not update times, they are used for submission and grading  
+        //$this->timecreated = $this->timemodified = time(); 
+        return parent::insert($source);
+    }
+
+    /**
+     * In addition to update() as defined in grade_object rounds the float numbers using php function,
+     * the reason is we need to compare the db value with computed number to skip updates if possible.
+     * @param string $source from where was the object inserted (mod/forum, manual, etc.)
+     * @return boolean success
+     */
+    function update($source=null) {
+        $this->rawgrade    = grade_floatval($this->rawgrade);
+        $this->finalgrade  = grade_floatval($this->finalgrade);
+        $this->rawgrademin = grade_floatval($this->rawgrademin);
+        $this->rawgrademax = grade_floatval($this->rawgrademax);
+        return parent::update($source);
     }
 }
 ?>

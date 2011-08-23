@@ -77,7 +77,7 @@
         $bloglimit = optional_param('limit', get_user_preferences('blogpagesize', 10), PARAM_INT);
         $start     = $blogpage * $bloglimit;
 
-        $sitecontext = get_context_instance(CONTEXT_SYSTEM, SITEID);
+        $sitecontext = get_context_instance(CONTEXT_SYSTEM);
 
         $morelink = '<br />&nbsp;&nbsp;';
 
@@ -236,8 +236,10 @@
 
         if (blog_user_can_edit_post($blogEntry)) {
             echo '<a href="'.$CFG->wwwroot.'/blog/edit.php?action=edit&amp;id='.$blogEntry->id.'">'.$stredit.'</a>';
-            echo '| <a href="'.$CFG->wwwroot.'/blog/edit.php?action=delete&amp;id='.$blogEntry->id.'">'.$strdelete.'</a>';
+            echo '| <a href="'.$CFG->wwwroot.'/blog/edit.php?action=delete&amp;id='.$blogEntry->id.'">'.$strdelete.'</a> | ';
         }
+
+        echo '<a href="'.$CFG->wwwroot.'/blog/index.php?postid='.$blogEntry->id.'">'.get_string('permalink', 'blog').'</a>';
 
         echo '</div>';
 
@@ -367,7 +369,7 @@
 
         global $CFG, $USER;
 
-        $sitecontext = get_context_instance(CONTEXT_SYSTEM, SITEID);
+        $sitecontext = get_context_instance(CONTEXT_SYSTEM);
 
         if (has_capability('moodle/blog:manageentries', $sitecontext)) {
             return true; // can edit any blog post
@@ -398,7 +400,7 @@
             return true; // can view own posts in any case
         }
 
-        $sitecontext = get_context_instance(CONTEXT_SYSTEM, SITEID);
+        $sitecontext = get_context_instance(CONTEXT_SYSTEM);
         if (has_capability('moodle/blog:manageentries', $sitecontext)) {
             return true; // can manage all posts
         }
@@ -522,7 +524,7 @@
             $tagquerysql = '';
         }
 
-        if (isloggedin() && !has_capability('moodle/legacy:guest', get_context_instance(CONTEXT_SYSTEM, SITEID), $USER->id, false)) {
+        if (isloggedin() && !has_capability('moodle/legacy:guest', get_context_instance(CONTEXT_SYSTEM), $USER->id, false)) {
             $permissionsql =  'AND (p.publishstate = \'site\' OR p.publishstate = \'public\' OR p.userid = '.$USER->id.')';
         } else {
             $permissionsql =  'AND p.publishstate = \'public\'';
@@ -530,7 +532,7 @@
 
         // fix for MDL-9165, use with readuserblogs capability in a user context can read that user's private blogs
         // admins can see all blogs regardless of publish states, as described on the help page
-        if (has_capability('moodle/user:readuserblogs', get_context_instance(CONTEXT_SYSTEM, SITEID))) {
+        if (has_capability('moodle/user:readuserblogs', get_context_instance(CONTEXT_SYSTEM))) {
             $permissionsql = '';
         } else if ($filtertype=='user' && has_capability('moodle/user:readuserblogs', get_context_instance(CONTEXT_USER, $filterselect))) {
             $permissionsql = '';
@@ -679,5 +681,19 @@
         return strip_querystring(qualified_me()) . $querystring. 'filtertype='.
                 $filtertype.'&amp;filterselect='.$filterselect.'&amp;';
 
+    }
+
+    /**
+     * Returns a list of all user ids who have used blogs in the site
+     * Used in backup of site courses.
+     */
+    function blog_get_participants() {
+
+        global $CFG;
+
+        return get_records_sql("SELECT userid as id 
+                                  FROM {$CFG->prefix}post
+                                 WHERE module = 'blog'
+                                   AND courseid = 0");
     }
 ?>

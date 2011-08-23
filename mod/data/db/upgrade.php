@@ -97,6 +97,20 @@ function xmldb_data_upgrade($oldversion=0) {
         }
     }
 
+//===== 1.9.0 upgrade line ======//
+
+    if ($result && $oldversion < 2007101512) {
+    /// Launch add field asearchtemplate again if does not exists yet - reported on several sites
+
+        $table = new XMLDBTable('data');
+        $field = new XMLDBField('asearchtemplate');
+        $field->setAttributes(XMLDB_TYPE_TEXT, 'small', null, null, null, null, null, null, 'jstemplate');
+
+        if (!field_exists($table, $field)) {
+            $result = $result && add_field($table, $field);
+        }
+    }
+
     return $result;
 }
 

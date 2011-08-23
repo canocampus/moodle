@@ -101,7 +101,7 @@ $ALLOWED_TAGS =
  */
 $ALLOWED_PROTOCOLS = array('http', 'https', 'ftp', 'news', 'mailto', 'rtsp', 'teamspeak', 'gopher', 'mms',
                            'color', 'callto', 'cursor', 'text-align', 'font-size', 'font-weight', 'font-style',
-                           'border', 'margin', 'padding', 'background');   // CSS as well to get through kses
+                           'border', 'margin', 'padding', 'background', 'text-decoration');   // CSS as well to get through kses
 
 
 /// Functions
@@ -685,7 +685,8 @@ if (!function_exists('stripos')) {    /// Only exists in PHP 5
  *
  * $url must be relative to home page  eg /mod/survey/stuff.php
  * @param string $url Web link relative to home page
- * @param string $name Name to be assigned to the popup window
+ * @param string $name Name to be assigned to the popup window (this is used by 
+ *   client-side scripts to "talk" to the popup window)
  * @param string $linkname Text to be displayed as web link
  * @param int $height Height to assign to popup window
  * @param int $width Height to assign to popup window
@@ -702,7 +703,7 @@ function element_to_popup_window ($type=null, $url=null, $name=null, $linkname=n
                                   $options=null, $return=false, $id=null, $class=null) {
 
     if (is_null($url)) {
-        error('There must be an url to the popup. Can\'t create popup window.');
+        debugging('You must give the url to display in the popup. URL is missing - can\'t create popup window.', DEBUG_DEVELOPER);
     }
 
     global $CFG;
@@ -727,12 +728,17 @@ function element_to_popup_window ($type=null, $url=null, $name=null, $linkname=n
     if ($class) {
         $class = ' class="'.$class.'" ';
     }
-
-    // get some default string, using the localized version of legacy defaults
-    if (!$name) {
-        $name = get_string('popupwindow');
+    if ($name) {
+        $_name = $name;
+        if (($name = preg_replace("/\s/", '_', $name)) != $_name) {
+            debugging('The $name of a popup window shouldn\'t contain spaces - string modified. '. $_name .' changed to '. $name, DEBUG_DEVELOPER);
+        }
+    } else {
+        $name = 'popup';
     }
-    if (!$linkname) {
+    
+    // get some default string, using the localized version of legacy defaults
+    if (is_null($linkname) || $linkname === '') {
         $linkname = get_string('clickhere');
     }
     if (!$title) {
@@ -806,7 +812,7 @@ function close_window_button($name='closewindow', $return=false) {
     $output = '';
 
     $output .= '<div class="closewindow">' . "\n";
-    $output .= '<form action="'.$CFG->wwwroot.'"><div>';   // We don't use this
+    $output .= '<form action="#"><div>';
     $output .= '<input type="button" onclick="self.close();" value="'.get_string($name).'" />';
     $output .= '</div></form>';
     $output .= '</div>' . "\n";
@@ -1167,8 +1173,16 @@ $targetwindow='self', $selectlabel='', $optionsextra=NULL) {
         $selectlabel = '<label for="'.$formid.'_jump">'.$selectlabel.'</label>';
     }
 
-    $output .= '<div>'.$selectlabel.$button.'<select id="'.$formid.'_jump" name="jump" onchange="'.$targetwindow.'.location=document.getElementById(\''.$formid.'\').jump.options[document.getElementById(\''.$formid.'\').jump.selectedIndex].value;">'."\n";
-
+    //IE and Opera fire the onchange when ever you move into a dropdwown list with the keyboard. 
+    //onfocus will call a function inside dropdown.js. It fixes this IE/Opera behavior.
+    if (check_browser_version('MSIE') || check_browser_version('Opera')) {
+        $output .= '<div>'.$selectlabel.$button.'<select id="'.$formid.'_jump" onfocus="initSelect(\''.$formid.'\','.$targetwindow.')" name="jump">'."\n";
+    }
+    //Other browser
+    else {
+        $output .= '<div>'.$selectlabel.$button.'<select id="'.$formid.'_jump" name="jump" onchange="'.$targetwindow.'.location=document.getElementById(\''.$formid.'\').jump.options[document.getElementById(\''.$formid.'\').jump.selectedIndex].value;">'."\n";  
+    }
+    
     if ($nothing != '') {
         $output .= "   <option value=\"javascript:void(0)\">$nothing</option>\n";
     }
@@ -2081,8 +2095,13 @@ function cleanAttributes2($htmlArray){
  * @return string
  */
 function replace_smilies(&$text) {
-///
+
     global $CFG;
+
+    if (empty($CFG->emoticons)) { /// No emoticons defined, nothing to process here
+        return;
+    }
+
     $lang = current_language();
     $emoticonstring = $CFG->emoticons;
     static $e = array();
@@ -2483,7 +2502,7 @@ function print_header ($title='', $heading='', $navigation='', $focus='',
                     } else {
                         $menu .= get_string('failedloginattemptsall', '', $count);
                     }
-                    if (has_capability('moodle/site:viewreports', get_context_instance(CONTEXT_SYSTEM, SITEID))) {
+                    if (has_capability('moodle/site:viewreports', get_context_instance(CONTEXT_SYSTEM))) {
                         $menu .= ' (<a href="'.$CFG->wwwroot.'/course/report/log/index.php'.
                                              '?chooselog=1&amp;id=1&amp;modid=site_errors">'.get_string('logs').'</a>)';
                     }
@@ -2575,16 +2594,6 @@ function print_header ($title='', $heading='', $navigation='', $focus='',
 
     if (!empty($CFG->blocksdrag)) {
         $pageclass .= ' drag';
-    }
-
-    /* give pages without heading or navigation special classes, to
-     * allow theming of very simple windows (popups and others) */
-    if ($heading == '') {
-        $pageclass .= ' noheader';
-    }
-
-    if ($navigation == '') {
-        $pageclass .= ' nonavigation';
     }
 
     $pageclass .= ' dir-'.get_string('thisdirection');
@@ -2880,7 +2889,7 @@ function print_footer($course=NULL, $usercourse=NULL, $return=false) {
         } else if ($course === 'home') {   // special case for site home page - please do not remove
             $course = get_site();
             $homelink  = '<div class="sitelink">'.
-               '<a title="moodle '. $CFG->release .' ('. $CFG->version .')" href="http://moodle.org/">'.
+               '<a title="Moodle '. $CFG->release .'" href="http://moodle.org/">'.
                '<img style="width:100px;height:30px" src="pix/moodlelogo.gif" alt="moodlelogo" /></a></div>';
             $home  = true;
 
@@ -4209,7 +4218,7 @@ function print_single_button($link, $options, $label='OK', $method='get', $targe
     }
     if ($jsconfirmmessage){
         $jsconfirmmessage = addslashes_js($jsconfirmmessage);
-        $jsconfirmmessage = 'onclick="'.s('return confirm("'.$jsconfirmmessage.'");').'"';
+        $jsconfirmmessage = 'onclick="return confirm(\''. $jsconfirmmessage .'\');" ';
     }
     $output .= '<input type="submit" value="'. s($label) ."\" $tooltip $disabled $jsconfirmmessage/></div></form></div>";
 
@@ -4347,10 +4356,11 @@ function print_user_picture($user, $courseid, $picture=NULL, $size=0, $return=fa
     }
 
     if ($link) {
+        $url = '/user/view.php?id='. $user->id .'&amp;course='. $courseid ;
         if ($target) {
-            $target=' target="_blank"';
+            $target='onclick="return openpopup(\''.$url.'\');"';
         }
-        $output = '<a '.$target.' href="'. $CFG->wwwroot .'/user/view.php?id='. $user->id .'&amp;course='. $courseid .'">';
+        $output = '<a '.$target.' href="'. $CFG->wwwroot . $url .'">';
     } else {
         $output = '';
     }
@@ -4780,7 +4790,7 @@ function print_recent_activity_note($time, $user, $text, $link, $return=false, $
     $output = '';
 
     if (is_null($viewfullnames)) {
-        $context = get_context_instance(CONTEXT_SYSTEM, SITEID);
+        $context = get_context_instance(CONTEXT_SYSTEM);
         $viewfullnames = has_capability('moodle/site:viewfullnames', $context);
     }
 
@@ -5173,7 +5183,7 @@ function update_category_button($categoryid) {
 function update_categories_button() {
     global $CFG, $USER;
 
-    if (has_capability('moodle/category:update', get_context_instance(CONTEXT_SYSTEM, SITEID))) {
+    if (has_capability('moodle/category:update', get_context_instance(CONTEXT_SYSTEM))) {
         if (!empty($USER->categoryediting)) {
             $string = get_string('turneditingoff');
             $categoryedit = 'off';
@@ -5199,7 +5209,7 @@ function update_categories_search_button($search,$page,$perpage) {
     global $CFG, $USER;
 
     // not sure if this capability is the best  here
-    if (has_capability('moodle/category:update', get_context_instance(CONTEXT_SYSTEM, SITEID))) {
+    if (has_capability('moodle/category:update', get_context_instance(CONTEXT_SYSTEM))) {
         if (!empty($USER->categoryediting)) {
             $string = get_string("turneditingoff");
             $edit = "off";
@@ -5315,23 +5325,25 @@ function navmenu($course, $cm=NULL, $targetwindow='self') {
             $nextmod = $mod;
             $flag = false;
         }
+        $localname = $mod->name;
         if ($cm == $mod->id) {
             $selected = $url;
             $selectmod = $mod;
             $backmod = $previousmod;
             $flag = true; // set flag so we know to use next mod for "next"
-            $mod->name = $strjumpto;
+            $localname = $strjumpto;
             $strjumpto = '';
         } else {
-            $mod->name = strip_tags(format_string(urldecode($mod->name),true));
-            if (strlen($mod->name) > ($width+5)) {
-                $mod->name = substr($mod->name, 0, $width).'...';
+            $localname = strip_tags(format_string($localname,true));
+            $tl=textlib_get_instance();
+            if ($tl->strlen($localname) > ($width+5)) {
+                $localname = $tl->substr($localname, 0, $width).'...';
             }
             if (!$mod->visible) {
-                $mod->name = '('.$mod->name.')';
+                $localname = '('.$localname.')';
             }
         }
-        $menu[$url] = $mod->name;
+        $menu[$url] = $localname;
         if (empty($THEME->navmenuiconshide)) {
             $menustyle[$url] = 'style="background-image: url('.$CFG->modpixpath.'/'.$mod->modname.'/icon.gif);"';  // Unfortunately necessary to do this here
         }
@@ -5641,42 +5653,23 @@ function print_scale_menu_helpbutton($courseid, $scale, $return=false) {
 }
 
 /**
- * Print an error page displaying an error message.
- * Old method, don't call directly in new code - use print_error instead.
- *
+ * Print an error page displaying an error message.  New method - use this for new code.
  *
  * @uses $SESSION
  * @uses $CFG
- * @param string $message The message to display to the user about the error.
+ * @param string $errorcode The name of the string from error.php to print
  * @param string $link The url where the user will be prompted to continue. If no url is provided the user will be directed to the site index page.
+ * @param object $a Extra words and phrases that might be required in the error string
  */
-function error ($message, $link='') {
+function print_error ($errorcode, $module='', $link='', $a=NULL) {
 
     global $CFG, $SESSION, $THEME;
-    $message = clean_text($message);   // In case nasties are in here
 
-    if (defined('FULLME') && FULLME == 'cron') {
-        // Errors in cron should be mtrace'd.
-        mtrace($message);
-        die;
-    }
-
-    if (! defined('HEADER_PRINTED')) {
-        //header not yet printed
-        @header('HTTP/1.0 404 Not Found');
-        print_header(get_string('error'));
+    if (empty($module) || $module == 'moodle' || $module == 'core') {
+        $module = 'error';
+        $modulelink = 'moodle';
     } else {
-        print_container_end_all(false, $THEME->open_header_containers);
-    }
-
-    echo '<br />';
-    print_simple_box($message, '', '', '', '', 'errorbox');
-
-    debugging('Stack trace:', DEBUG_DEVELOPER);
-
-    // in case we are logging upgrade in admin/index.php stop it
-    if (function_exists('upgrade_log_finish')) {
-        upgrade_log_finish();
+        $modulelink = $module;
     }
 
     if (empty($link) and !defined('ADMIN_EXT_HEADER_PRINTED')) {
@@ -5688,6 +5681,46 @@ function error ($message, $link='') {
         }
     }
 
+    if (!empty($CFG->errordocroot)) {
+        $errordocroot = $CFG->errordocroot;
+    } else if (!empty($CFG->docroot)) {
+        $errordocroot = $CFG->docroot;
+    } else {
+        $errordocroot = 'http://docs.moodle.org';
+    }
+
+    $message = get_string($errorcode, $module, $a);
+
+    if (defined('FULLME') && FULLME == 'cron') {
+        // Errors in cron should be mtrace'd.
+        mtrace($message);
+        die;
+    }
+
+    $message = clean_text('<p class="errormessage">'.$message.'</p>'.
+               '<p class="errorcode">'.
+               '<a href="'.$errordocroot.'/en/error/'.$modulelink.'/'.$errorcode.'">'.
+                 get_string('moreinformation').'</a></p>');
+
+    if (! defined('HEADER_PRINTED')) {
+        //header not yet printed
+        @header('HTTP/1.0 404 Not Found');
+        print_header(get_string('error'));
+    } else {
+        print_container_end_all(false, $THEME->open_header_containers);
+    }
+
+    echo '<br />';
+
+    print_simple_box($message, '', '', '', '', 'errorbox');
+
+    debugging('Stack trace:', DEBUG_DEVELOPER);
+
+    // in case we are logging upgrade in admin/index.php stop it
+    if (function_exists('upgrade_log_finish')) {
+        upgrade_log_finish();
+    }
+
     if (!empty($link)) {
         print_continue($link);
     }
@@ -5697,43 +5730,7 @@ function error ($message, $link='') {
     for ($i=0;$i<512;$i++) {  // Padding to help IE work with 404
         echo ' ';
     }
-
     die;
-}
-
-/**
- * Print an error page displaying an error message.  New method - use this for new code.
- *
- * @uses $SESSION
- * @uses $CFG
- * @param string $errorcode The name of the string from error.php to print
- * @param string $link The url where the user will be prompted to continue. If no url is provided the user will be directed to the site index page.
- * @param object $a Extra words and phrases that might be required in the error string
- */
-function print_error ($errorcode, $module='', $link='', $a=NULL) {
-
-    global $CFG;
-
-    if (empty($module) || $module == 'moodle' || $module == 'core') {
-        $module = 'error';
-        $modulelink = 'moodle';
-    } else {
-        $modulelink = $module;
-    }
-
-    if (!empty($CFG->errordocroot)) {
-        $errordocroot = $CFG->errordocroot;
-    } else if (!empty($CFG->docroot)) {
-        $errordocroot = $CFG->docroot;
-    } else {
-        $errordocroot = 'http://docs.moodle.org';
-    }
-
-    $message = '<p class="errormessage">'.get_string($errorcode, $module, $a).'</p>'.
-               '<p class="errorcode">'.
-               '<a href="'.$errordocroot.'/en/error/'.$modulelink.'/'.$errorcode.'">'.
-                 get_string('moreinformation').'</a></p>';
-    error($message, $link);
 }
 
 /**
@@ -5812,7 +5809,7 @@ function editorhelpbutton(){
 
     $paramstring = join('&', $urlparams);
     $linkobject = '<img alt="'.$alttag.'" class="iconhelp" src="'.$CFG->pixpath .'/help.gif" />';
-    return link_to_popup_window(s('/lib/form/editorhelp.php?'.$paramstring), $alttag, $linkobject, 400, 500, $alttag, 'none', true);
+    return link_to_popup_window(s('/lib/form/editorhelp.php?'.$paramstring), 'popup', $linkobject, 400, 500, $alttag, 'none', true);
 }
 
 /**
@@ -6095,9 +6092,9 @@ function redirect($url, $message='', $delay=-1) {
     } else {
         print_container_end_all(false, $THEME->open_header_containers);
     }
-    echo '<div style="text-align:center">';
-    echo '<div>'. $message .'</div>';
-    echo '<div>( <a href="'. $encodedurl .'">'. get_string('continue') .'</a> )</div>';
+    echo '<div id="redirect">';
+    echo '<div id="message">' . $message . '</div>';
+    echo '<div id="continue">( <a href="'. $encodedurl .'">'. get_string('continue') .'</a> )</div>';
     echo '</div>';
 
     if (!$errorprinted) {
@@ -6114,6 +6111,7 @@ function redirect($url, $message='', $delay=-1) {
 <?php
     }
 
+    $CFG->docroot = false; // to prevent the link to moodle docs from being displayed on redirect page.
     print_footer('none');
     die;
 }
@@ -6502,16 +6500,16 @@ function print_speller_code ($usehtmleditor=false, $return=false) {
     if(!$usehtmleditor) {
         $str .= 'function openSpellChecker() {'."\n";
         $str .= "\tvar speller = new spellChecker();\n";
-        $str .= "\tspeller.popUpUrl = \"" . $CFG->wwwroot ."/lib/speller/spellchecker.html\";\n";
-        $str .= "\tspeller.spellCheckScript = \"". $CFG->wwwroot ."/lib/speller/server-scripts/spellchecker.php\";\n";
+        $str .= "\tspeller.popUpUrl = \"" . $CFG->httpswwwroot ."/lib/speller/spellchecker.html\";\n";
+        $str .= "\tspeller.spellCheckScript = \"". $CFG->httpswwwroot ."/lib/speller/server-scripts/spellchecker.php\";\n";
         $str .= "\tspeller.spellCheckAll();\n";
         $str .= '}'."\n";
     } else {
         $str .= "function spellClickHandler(editor, buttonId) {\n";
         $str .= "\teditor._textArea.value = editor.getHTML();\n";
         $str .= "\tvar speller = new spellChecker( editor._textArea );\n";
-        $str .= "\tspeller.popUpUrl = \"" . $CFG->wwwroot ."/lib/speller/spellchecker.html\";\n";
-        $str .= "\tspeller.spellCheckScript = \"". $CFG->wwwroot ."/lib/speller/server-scripts/spellchecker.php\";\n";
+        $str .= "\tspeller.popUpUrl = \"" . $CFG->httpswwwroot ."/lib/speller/spellchecker.html\";\n";
+        $str .= "\tspeller.spellCheckScript = \"". $CFG->httpswwwroot ."/lib/speller/server-scripts/spellchecker.php\";\n";
         $str .= "\tspeller._moogle_edit=1;\n";
         $str .= "\tspeller._editor=editor;\n";
         $str .= "\tspeller.openChecker();\n";
@@ -6790,7 +6788,7 @@ function page_doc_link($text='', $iconpath='') {
  */
 function doc_link($path='', $text='', $iconpath='') {
     global $CFG;
-
+    
     if (empty($CFG->docroot)) {
         return '';
     }
@@ -6804,7 +6802,7 @@ function doc_link($path='', $text='', $iconpath='') {
 
     $str = '<a href="' .$CFG->docroot. '/' .$lang. '/' .$path. '"' .$target. '>';
 
-    if (empty($iconpath)) {
+    if (empty($iconpath)) { 
         $iconpath = $CFG->httpswwwroot . '/pix/docs.gif';
     }
 

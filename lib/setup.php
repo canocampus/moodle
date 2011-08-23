@@ -155,6 +155,8 @@ global $HTTPSPAGEREQUIRED;
         echo '</td></tr></table>';
         echo '</body></html>';
 
+        error_log('ADODB Error: '.$db->ErrorMsg()); // see MDL-14628
+
         if (empty($CFG->noemailever) and !empty($CFG->emailconnectionerrorsto)) {
             mail($CFG->emailconnectionerrorsto, 
                  'WARNING: Database connection error: '.$CFG->wwwroot, 
@@ -311,15 +313,15 @@ global $HTTPSPAGEREQUIRED;
         if ($CFG->cachetype === 'memcached' && !empty($CFG->memcachedhosts)) {
             if (!init_memcached()) {
                 debugging("Error initialising memcached");
+                $CFG->cachetype = '';
+                $CFG->rcache = false;
             }
-            $CFG->cachetype = '';
-            $CFG->rcache = false;
         } else if ($CFG->cachetype === 'eaccelerator') {
             if (!init_eaccelerator()) {
                 debugging("Error initialising eaccelerator cache");
+                $CFG->cachetype = '';
+                $CFG->rcache = false;                
             }
-            $CFG->cachetype = '';
-            $CFG->rcache = false;
         }
 
     } else { // just make sure it is defined

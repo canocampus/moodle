@@ -316,6 +316,11 @@ table.calendarmonth tr td  {
 	line-height: 22px;
 }
 
+#course-view .section td.content ul.section.img-text li.activity.label {
+	line-height: 16px;
+	margin-bottom: 5px;
+}
+
 .coursebox .info .name {
   padding-bottom: 5px;
   }
@@ -324,4 +329,11 @@ table.calendarmonth tr td  {
    padding-top: 4px; 
 } 
 
+/***
+ *** Error message
+ ***/
 
+.errorbox {
+/*   color:#ffffff; */
+   border-width: 2px;
+}

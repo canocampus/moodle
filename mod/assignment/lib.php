@@ -231,10 +231,12 @@ class assignment_base {
         }
 
         $graded_date = $grade->dategraded;
-            $graded_by   = $grade->usermodified;
+        $graded_by   = $grade->usermodified;
 
     /// We need the teacher info
-        $teacher = get_record('user', 'id', $graded_by);
+        if (!$teacher = get_record('user', 'id', $graded_by)) {
+            error('Could not find the teacher');
+        }
 
     /// Print the feedback
         print_heading(get_string('feedbackfromteacher', 'assignment', $this->course->teacher)); // TODO: fix teacher string
@@ -584,6 +586,9 @@ class assignment_base {
 
                     if ($updatedb){
                         if ($newsubmission) {
+                            if (!isset($submission->submissioncomment)) {
+                                $submission->submissioncomment = '';
+                            }
                             if (!$sid = insert_record('assignment_submissions', $submission)) {
                                 return false;
                             }
@@ -1043,10 +1048,10 @@ class assignment_base {
         $navigation = build_navigation($this->strsubmissions, $this->cm);
         print_header_simple(format_string($this->assignment->name,true), "", $navigation,
                 '', '', true, update_module_button($cm->id, $course->id, $this->strassignment), navmenu($course, $cm));
-        
+
         $course_context = get_context_instance(CONTEXT_COURSE, $course->id);
         if (has_capability('gradereport/grader:view', $course_context) && has_capability('moodle/grade:viewall', $course_context)) {
-            echo '<div class="allcoursegrades"><a href="' . $CFG->wwwroot . '/grade/report/grader/index.php?id=' . $course->id . '">' 
+            echo '<div class="allcoursegrades"><a href="' . $CFG->wwwroot . '/grade/report/grader/index.php?id=' . $course->id . '">'
                 . get_string('seeallcoursegrades', 'grades') . '</a></div>';
         }
 
@@ -1121,7 +1126,7 @@ class assignment_base {
         $table->set_attribute('cellspacing', '0');
         $table->set_attribute('id', 'attempts');
         $table->set_attribute('class', 'submissions');
-        $table->set_attribute('width', '90%');
+        $table->set_attribute('width', '100%');
         //$table->set_attribute('align', 'center');
 
         $table->no_sorting('finalgrade');
@@ -1236,7 +1241,7 @@ class assignment_base {
                     $teachermodified = '<div id="tt'.$auser->id.'">&nbsp;</div>';
                     $status          = '<div id="st'.$auser->id.'">&nbsp;</div>';
 
-                    if ($final_grade->locked or $final_grade->overridden) { 
+                    if ($final_grade->locked or $final_grade->overridden) {
                         $grade = '<div id="g'.$auser->id.'">'.$final_grade->formatted_grade . '</div>';
                     } else if ($quickgrade) {   // allow editing
                         $menu = choose_from_menu(make_grades_menu($this->assignment->grade),
@@ -1682,12 +1687,7 @@ class assignment_base {
                 foreach ($files as $key => $file) {
 
                     $icon = mimeinfo('icon', $file);
-
-                    if ($CFG->slasharguments) {
-                        $ffurl = "$CFG->wwwroot/file.php/$filearea/$file";
-                    } else {
-                        $ffurl = "$CFG->wwwroot/file.php?file=/$filearea/$file";
-                    }
+                    $ffurl = get_file_url("$filearea/$file", array('forcedownload'=>1));
 
                     $output .= '<img src="'.$CFG->pixpath.'/f/'.$icon.'" class="icon" alt="'.$icon.'" />'.
                             '<a href="'.$ffurl.'" >'.$file.'</a><br />';
@@ -2051,8 +2051,6 @@ function assignment_cron () {
 
     if ($submissions = assignment_get_unmailed_submissions($starttime, $endtime)) {
 
-        $CFG->enablerecordcache = true;      // We want all the caching we can get
-
         $realuser = clone($USER);
 
         foreach ($submissions as $key => $submission) {
@@ -2232,7 +2230,7 @@ function assignment_grade_item_update($assignment, $grades=NULL) {
         $params['scaleid']   = -$assignment->grade;
 
     } else {
-        $params['gradetype'] = GRADE_TYPE_NONE;
+        $params['gradetype'] = GRADE_TYPE_TEXT; // allow text comments only
     }
 
     if ($grades  === 'reset') {
@@ -2536,7 +2534,7 @@ function assignment_get_recent_mod_activity(&$activities, &$index, $timestart, $
         }
 
         // the act of sumitting of assignemnt may be considered private - only graders will see it if specified
-        if (!empty($CFG->assignment_limitrecentsubmissions)) {
+        if (!empty($CFG->assignment_showrecentsubmissions)) {
             if (!$grader) {
                 continue;
             }
@@ -2795,13 +2793,13 @@ function assignment_get_coursemodule_info($coursemodule) {
         require_once($libfile);
         $assignmentclass = "assignment_$assignment->assignmenttype";
         $ass = new $assignmentclass('staticonly');
-        if ($result = $ass->get_coursemodule_info($coursemodule)) { 
+        if ($result = $ass->get_coursemodule_info($coursemodule)) {
             return $result;
         } else {
             $info = new object();
             $info->name = $assignment->name;
             return $info;
-        } 
+        }
 
     } else {
         debugging('Incorrect assignment type: '.$assignment->assignmenttype);

@@ -102,7 +102,7 @@ function message_print_contacts() {
         echo '</div>';
     }
 
-    echo '<table id="message_contacts" align="center" cellspacing="2" cellpadding="0" border="0">';
+    echo '<table id="message_contacts" class="boxaligncenter" cellspacing="2" cellpadding="0" border="0">';
 
     if($countonlinecontacts) {
         /// print out list of online contacts
@@ -160,7 +160,7 @@ function message_print_contacts() {
 document.write("'.$autorefresh.'")
 //]]>
 </script>';
-    echo '<noscript><div align="center">';
+    echo '<noscript><div class="button aligncenter">';
     echo print_single_button('index.php', false, get_string('refresh'));
     echo '</div></noscript>';
 }
@@ -408,7 +408,7 @@ function message_print_search_results($frm) {
             echo "</tr>\n";
 
             $blockedcount = 0;
-            $dateformat = get_string('strftimedatetime');
+            $dateformat = get_string('strftimedatetimeshort');
             $strcontext = get_string('context', 'message');
             foreach ($messages as $message) {
 
@@ -910,7 +910,7 @@ function message_format_message(&$message, &$user, $format='', $keywords='', $cl
         if ($format) {
             $dateformat = $format;
         } else {
-            $format = get_string('strftimedaytime');
+            $format = get_string('strftimedatetimeshort');
         }
     }
     $time = userdate($message->timecreated, $dateformat);
@@ -928,7 +928,14 @@ function message_format_message(&$message, &$user, $format='', $keywords='', $cl
  */
 function message_post_message($userfrom, $userto, $message, $format, $messagetype) {
 
-    global $CFG, $SITE;
+    global $CFG, $SITE, $USER;
+
+/// Set up current language to suit the receiver of the message
+    $savelang = $USER->lang;
+    
+    if (!empty($userto->lang)) {
+        $USER->lang = $userto->lang;
+    }
 
 /// Save the new message in the database
 
@@ -966,8 +973,8 @@ function message_post_message($userfrom, $userto, $message, $format, $messagetyp
             $message = stripslashes_safe($message);
             $tagline = get_string('emailtagline', 'message', $SITE->shortname);
 
-            $messagesubject = message_shorten_message(strip_tags($message), 30).'...';
-            $messagesubject = str_replace("\n", ' ', $messagesubject);  // make sure it's all on one line
+            $messagesubject = preg_replace('/\s+/', ' ', strip_tags($message)); // make sure it's all on one line
+            $messagesubject = message_shorten_message($messagesubject, 30).'...';
 
             $messagetext = format_text_email($message, $format).
                            "\n\n--\n".$tagline."\n"."$CFG->wwwroot/message/index.php?popup=1";
@@ -993,6 +1000,8 @@ function message_post_message($userfrom, $userto, $message, $format, $messagetyp
             sleep(3);
         }
     }
+
+    $USER->lang = $savelang;  // restore original language
 
     return $savemessage->id;
 }
