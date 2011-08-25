@@ -1548,7 +1548,7 @@ define('RESTORE_GROUPS_GROUPINGS', 3);
                                         }
 
                                         $newidmod = insert_record("course_modules", addslashes_recursive($course_module));
-                                        if ($newidmod) {
+                                        if ($newidmod && is_number($mod->instance)) {
                                             //save old and new module id
                                             //In the info field, we save the original instance of the module
                                             //to use it later
