@@ -6827,99 +6827,50 @@ class core_string_manager implements string_manager {
     public function load_component_strings($component, $lang, $disablecache=false, $disablelocal=false) {
         global $CFG;
 
-        list($plugintype, $pluginname) = core_component::normalize_component($component);
-        if ($plugintype == 'core' and is_null($pluginname)) {
-            $component = 'core';
-        } else {
-            $component = $plugintype . '_' . $pluginname;
-        }
+        list($plugintype, $pluginname) = normalize_component($component);
 
-        $cachekey = $lang.'_'.$component;
+        $cachkey = $this->cache_key($plugintype, $pluginname, $lang);
 
+        // first use try to use cached location
         if (!$disablecache and !$disablelocal) {
             $string = $this->cache->get($cachekey);
             if ($string) {
+                $this->countdiskcache++;
                 return $string;
             }
         }
 
-        // no cache found - let us merge all possible sources of the strings
-        if ($plugintype === 'core') {
-            $file = $pluginname;
-            if ($file === null) {
-                $file = 'moodle';
-            }
-            $string = array();
-            // first load english pack
-            if (!file_exists("$CFG->dirroot/lang/en/$file.php")) {
-                return array();
-            }
-            include("$CFG->dirroot/lang/en/$file.php");
-            $originalkeys = array_keys($string);
-            $originalkeys = array_flip($originalkeys);
+        // which file are we looking for
+        $file = $plugintype.'_'. ($pluginname ?: 'moodle');
+        $file = str_replace(array("{$plugintype}_mod", "core_"), array('mod', ''), $file);
 
-            // and then corresponding local if present and allowed
-            if (!$disablelocal and file_exists("$this->localroot/en_local/$file.php")) {
-                include("$this->localroot/en_local/$file.php");
-            }
-            // now loop through all langs in correct order
-            $deps = $this->get_language_dependencies($lang);
-            foreach ($deps as $dep) {
-                // the main lang string location
-                if (file_exists("$this->otherroot/$dep/$file.php")) {
-                    include("$this->otherroot/$dep/$file.php");
-                }
-                if (!$disablelocal and file_exists("$this->localroot/{$dep}_local/$file.php")) {
-                    include("$this->localroot/{$dep}_local/$file.php");
-                }
-            }
-
-        } else {
-            if (!$location = core_component::get_plugin_directory($plugintype, $pluginname) or !is_dir($location)) {
+        // where should we look
+        $location = $CFG->dirroot;
+        if ($plugintype != 'core') {
+            $location = get_plugin_directory($plugintype, $pluginname);
+            if (!is_dir($location)) {
                 return array();
-            }
-            if ($plugintype === 'mod') {
-                // bloody mod hack
-                $file = $pluginname;
-            } else {
-                $file = $plugintype . '_' . $pluginname;
-            }
-            $string = array();
-            // first load English pack
-            if (!file_exists("$location/lang/en/$file.php")) {
-                //English pack does not exist, so do not try to load anything else
-                return array();
-            }
-            include("$location/lang/en/$file.php");
-            $originalkeys = array_keys($string);
-            $originalkeys = array_flip($originalkeys);
-            // and then corresponding local english if present
-            if (!$disablelocal and file_exists("$this->localroot/en_local/$file.php")) {
-                include("$this->localroot/en_local/$file.php");
-            }
-
-            // now loop through all langs in correct order
-            $deps = $this->get_language_dependencies($lang);
-            foreach ($deps as $dep) {
-                // legacy location - used by contrib only
-                if (file_exists("$location/lang/$dep/$file.php")) {
-                    include("$location/lang/$dep/$file.php");
-                }
-                // the main lang string location
-                if (file_exists("$this->otherroot/$dep/$file.php")) {
-                    include("$this->otherroot/$dep/$file.php");
-                }
-                // local customisations
-                if (!$disablelocal and file_exists("$this->localroot/{$dep}_local/$file.php")) {
-                    include("$this->localroot/{$dep}_local/$file.php");
-                }
             }
         }
 
-        // we do not want any extra strings from other languages - everything must be in en lang pack
-        $string = array_intersect_key($string, $originalkeys);
+        // string files will load strings here
+        $string = array();
 
-        if (!$disablelocal) {
+        $deps = $this->get_language_dependencies($lang);
+        foreach ($deps as $dep) {
+            // legacy location - used by contrib only
+            $this->include_helper("$location/lang/$dep/$file.php", $string);
+
+            // the main lang string location
+            $this->include_helper("$this->otherroot/$dep/$file.php", $string);
+
+            // local customisations
+            if (!$disablelocal) {
+                $this->include_helper("$this->localroot/{$dep}{$this->localpostfix}/$file.php", $string);
+            }
+        }
+
+        if (!$disablelocal && !$disablelocal) {
             // now we have a list of strings from all possible sources. put it into both in-memory and on-disk
             // caches so we do not need to do all this merging and dependencies resolving again
             $this->cache->set($cachekey, $string);
@@ -7340,7 +7291,7 @@ class core_string_manager implements string_manager {
      * @param array $stack list of parent languages already populated in previous recursive calls
      * @return array list of all parents of the given language with the $lang itself added as the last element
      */
-    protected function populate_parent_languages($lang, array $stack = array()) {
+    protected function populate_parent_languages($lang, array $stack = array('en')) {
 
         // English does not have a parent language.
         if ($lang === 'en') {
