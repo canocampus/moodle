@@ -6842,7 +6842,7 @@ class core_string_manager implements string_manager {
 
         // which file are we looking for
         $file = $plugintype.'_'. ($pluginname ?: 'moodle');
-        $file = str_replace(array("{$plugintype}_mod", "core_"), array('mod', ''), $file);
+        $file = str_replace(array("mod_", "core_"), array('', ''), $file);
 
         // where should we look
         $location = $CFG->dirroot;
